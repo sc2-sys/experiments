@@ -1,7 +1,8 @@
 use crate::experiment::{AvailableExperiments, EvalRunArgs, Exp};
 use crate::plot::Plot;
 use clap::{Parser, Subcommand};
-use env_logger;
+// TODO: configure logger
+// use env_logger;
 
 pub mod experiment;
 pub mod plot;
