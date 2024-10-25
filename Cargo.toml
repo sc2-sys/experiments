@@ -1,5 +1,5 @@
 [package]
-name = "sc2-experiments"
+name = "sc2-eval"
 version = "0.1.0"
 edition = "2021"
 

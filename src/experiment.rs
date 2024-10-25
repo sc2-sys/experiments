@@ -2,7 +2,7 @@ use clap::Args;
 use std::fmt;
 
 #[derive(Debug, Args)]
-pub struct EvalRunArgs {
+pub struct ExpRunArgs {
     #[arg(long, default_value = "3")]
     num_repeats: u32,
     #[arg(long, default_value = "1")]
@@ -29,5 +29,5 @@ impl fmt::Display for AvailableExperiments {
 pub struct Exp {}
 
 impl Exp {
-    pub fn run(_exp: &AvailableExperiments, _args: &EvalRunArgs) {}
+    pub fn run(_exp: &AvailableExperiments, _args: &ExpRunArgs) {}
 }
