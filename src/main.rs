@@ -53,17 +53,6 @@ fn main() {
             .init();
     }
 
-    // Initialize the logger based on the debug flag
-    if cli.debug {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Debug)
-            .init();
-    } else {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Info)
-            .init();
-    }
-
     match &cli.task {
         ExpCommand::ScaleOut {
             exp_sub_command: eval_sub_command,
