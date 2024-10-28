@@ -32,7 +32,7 @@ impl K8s {
             .expect("sc2-eval(k8s): failed to spawn kubectl command");
 
         match output.status.code() {
-            Some(0) => {},
+            Some(0) => {}
             Some(code) => {
                 let stderr =
                     str::from_utf8(&output.stderr).unwrap_or("sc2-exp(k8s): failed to get stderr");
@@ -84,8 +84,12 @@ impl K8s {
     }
 
     fn template_yaml(yaml_path: &PathBuf, env_vars: &BTreeMap<&str, String>) -> String {
-        debug!("{}(k8s): templating yaml file from: {yaml_path:?}", Env::SYS_NAME);
-        let yaml_content = fs::read_to_string(yaml_path).expect("sc2-exp(k8s): failed to read yaml");
+        debug!(
+            "{}(k8s): templating yaml file from: {yaml_path:?}",
+            Env::SYS_NAME
+        );
+        let yaml_content =
+            fs::read_to_string(yaml_path).expect("sc2-exp(k8s): failed to read yaml");
 
         // Use envsubst to substitute environment variables in the YAML
         let mut envsubst_cmd = Command::new("envsubst");
@@ -190,7 +194,10 @@ impl K8s {
                     str::from_utf8(&output.stdout).unwrap_or("sc2-exp(k8s): failed to get stdout");
                 let stderr =
                     str::from_utf8(&output.stderr).unwrap_or("sc2-exp(k8s): failed to get stderr");
-                panic!("{}(k8s): kubectl command failed: stdout: {stdout} - stderr: {stderr}", Env::SYS_NAME);
+                panic!(
+                    "{}(k8s): kubectl command failed: stdout: {stdout} - stderr: {stderr}",
+                    Env::SYS_NAME
+                );
             }
         };
     }
@@ -221,7 +228,7 @@ impl K8s {
             );
             let values: Vec<&str> = output.split_whitespace().collect();
 
-            if values.len() == 0 {
+            if values.is_empty() {
                 break;
             }
 

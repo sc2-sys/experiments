@@ -4,7 +4,8 @@ use clap::{Args, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
 use std::{
-    collections::BTreeMap, fmt, fs, io::Write, path::PathBuf, process::Command, str, str::FromStr, thread, time
+    collections::BTreeMap, fmt, fs, io::Write, path::PathBuf, process::Command, str, str::FromStr,
+    thread, time,
 };
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -58,7 +59,7 @@ impl fmt::Display for AvailableExperiments {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AvailableExperiments::ScaleOut => write!(f, "scale-out"),
-            AvailableExperiments::StartUp => write!(f, "scale-up"),
+            AvailableExperiments::StartUp => write!(f, "start-up"),
         }
     }
 }
@@ -80,6 +81,12 @@ impl ExecutionResult {
             end_time: Utc::now(),
             event_ts: BTreeMap::new(),
         }
+    }
+}
+
+impl Default for ExecutionResult {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -117,7 +124,6 @@ impl Exp {
     ) {
         let mut file = fs::OpenOptions::new()
             .read(true)
-            .write(true)
             .append(true)
             .open(results_file)
             .expect("sc2-eval(k8s): failed to open data file at: {results_file:?}");
@@ -206,10 +212,9 @@ impl Exp {
             Some(0) => {
                 exec_result.end_time = Utc::now();
 
-                let stdout =
-                    str::from_utf8(&output.stdout)
-                        .unwrap_or("sc2-exp(k8s): failed to get stdout")
-                        .trim();
+                let stdout = str::from_utf8(&output.stdout)
+                    .unwrap_or("sc2-exp(k8s): failed to get stdout")
+                    .trim();
                 debug!("{}(k8s): got '{stdout}'", Env::SYS_NAME);
             }
             Some(code) => {
@@ -255,7 +260,7 @@ impl Exp {
         env_vars: &BTreeMap<&str, String>,
     ) {
         // Deploy the baseline
-        let service_ip = K8s::deploy_knative_service(&yaml_path, &env_vars);
+        let service_ip = K8s::deploy_knative_service(yaml_path, env_vars);
 
         // Cautionary sleep before starting the experiment
         thread::sleep(time::Duration::from_secs(2));
@@ -299,7 +304,7 @@ impl Exp {
         pb.finish();
 
         // Delete the experiment
-        K8s::delete_knative_service(&yaml_path, &env_vars);
+        K8s::delete_knative_service(yaml_path, env_vars);
     }
 
     /// Main entrypoint to execute an experiment in SC2. We iterate over the
