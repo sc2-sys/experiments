@@ -214,6 +214,15 @@ impl K8s {
         Self::get_knative_service_ip(&env_vars["KSERVICE_NAME"])
     }
 
+    /// Get the Knative deployment ID given a service name
+    pub fn get_knative_deployment_id(service_name: &str) -> String {
+        Self::run_kubectl_cmd(
+            &format!("-n {} get deployments -l apps.sc2.io/name={service_name} -o jsonpath={{.items..metadata.name}}",
+            Env::K8S_NAMESPACE
+            )
+        )
+    }
+
     pub fn scale_knative_service_to_zero(service_name: &str) {
         // Wait for the scale-to-zero to take effect
         loop {

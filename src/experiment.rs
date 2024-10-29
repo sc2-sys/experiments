@@ -1,14 +1,15 @@
-use crate::{env::Env, kubernetes::K8s};
+use crate::{containerd::Containerd, env::Env, kubernetes::K8s};
 use chrono::{DateTime, Duration, Utc};
 use clap::{Args, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
+use plotters::prelude::RGBColor;
 use std::{
     collections::BTreeMap, fmt, fs, io::Write, path::PathBuf, process::Command, str, str::FromStr,
     thread, time,
 };
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
 pub enum AvailableBaselines {
     Kata,
     Snp,
@@ -34,6 +35,25 @@ impl FromStr for AvailableBaselines {
             "snp" => Ok(AvailableBaselines::Snp),
             "tdx" => Ok(AvailableBaselines::Tdx),
             _ => Err(()),
+        }
+    }
+}
+
+impl AvailableBaselines {
+    pub fn iter_variants() -> std::slice::Iter<'static, AvailableBaselines> {
+        static VARIANTS: [AvailableBaselines; 3] = [
+            AvailableBaselines::Kata,
+            AvailableBaselines::Snp,
+            AvailableBaselines::Tdx,
+        ];
+        VARIANTS.iter()
+    }
+
+    pub fn get_color(&self) -> RGBColor {
+        match self {
+            AvailableBaselines::Kata => RGBColor(171, 222, 230),
+            AvailableBaselines::Snp => RGBColor(203, 170, 203),
+            AvailableBaselines::Tdx => RGBColor(255, 255, 181),
         }
     }
 }
@@ -195,9 +215,6 @@ impl Exp {
         // Note that this initialises start_time to Utc::now()
         let mut exec_result = ExecutionResult::new();
 
-        // Annoyingly, sometimes the `curl` command seems to exit succesfully,
-        // i.e. rc 0, but not with the right reply.
-
         // Do single execution
         debug!(
             "{}: running curl command to ip: {service_ip}",
@@ -234,7 +251,15 @@ impl Exp {
             }
         };
 
-        // TODO: for start-up plot, add breakdown of latency here too
+        let deployment_id = K8s::get_knative_deployment_id(service_name);
+        // Get the cutoff time to filter outputs of the journal log, and leave us some slack
+        let cutoff_time = exec_result.start_time - chrono::Duration::milliseconds(500);
+
+        debug!(
+            "{}(k8s): got knative deployment id: {deployment_id}",
+            Env::SYS_NAME
+        );
+        exec_result.event_ts = Containerd::get_events_from_journalctl(&deployment_id, &cutoff_time);
 
         // Common clean-up after single execution
         debug!(

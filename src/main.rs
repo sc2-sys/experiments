@@ -2,6 +2,7 @@ use crate::experiment::{AvailableExperiments, Exp, ExpRunArgs};
 use crate::plot::Plot;
 use clap::{Parser, Subcommand};
 
+pub mod containerd;
 pub mod env;
 pub mod experiment;
 pub mod kubernetes;
