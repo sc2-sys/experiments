@@ -2,6 +2,7 @@ use crate::experiment::{AvailableExperiments, Exp, ExpRunArgs};
 use crate::plot::Plot;
 use clap::{Parser, Subcommand};
 
+pub mod containerd;
 pub mod env;
 pub mod experiment;
 pub mod kubernetes;
@@ -41,17 +42,6 @@ enum ExpCommand {
 
 fn main() {
     let cli = Cli::parse();
-
-    // Initialize the logger based on the debug flag
-    if cli.debug {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Debug)
-            .init();
-    } else {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Info)
-            .init();
-    }
 
     // Initialize the logger based on the debug flag
     if cli.debug {
