@@ -1,4 +1,12 @@
-## SC2 Experiments
+<div align="center">
+  <h1><code>sc2-exp</code></h1>
+
+  <p>
+    <strong>Experiments for
+    <a href="https://github.com/sc2-sys/">Serverless Confidential Containers (SC2)</a></strong>
+  </p>
+  <hr>
+</div>
 
 This repository contains the experiment scripts for SC2. You may navigate
 to any of the different experiments:
