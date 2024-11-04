@@ -13,6 +13,7 @@ use std::{
 pub enum AvailableBaselines {
     Kata,
     Snp,
+    SnpSc2,
     Tdx,
 }
 
@@ -21,6 +22,7 @@ impl fmt::Display for AvailableBaselines {
         match self {
             AvailableBaselines::Kata => write!(f, "kata"),
             AvailableBaselines::Snp => write!(f, "snp"),
+            AvailableBaselines::SnpSc2 => write!(f, "snp-sc2"),
             AvailableBaselines::Tdx => write!(f, "tdx"),
         }
     }
@@ -33,6 +35,7 @@ impl FromStr for AvailableBaselines {
         match input {
             "kata" => Ok(AvailableBaselines::Kata),
             "snp" => Ok(AvailableBaselines::Snp),
+            "snp-sc2" => Ok(AvailableBaselines::SnpSc2),
             "tdx" => Ok(AvailableBaselines::Tdx),
             _ => Err(()),
         }
@@ -53,6 +56,7 @@ impl AvailableBaselines {
         match self {
             AvailableBaselines::Kata => RGBColor(171, 222, 230),
             AvailableBaselines::Snp => RGBColor(203, 170, 203),
+            AvailableBaselines::SnpSc2 => RGBColor(213, 160, 163),
             AvailableBaselines::Tdx => RGBColor(255, 255, 181),
         }
     }
@@ -367,7 +371,8 @@ impl Exp {
                     match baseline {
                         AvailableBaselines::Kata => "kata-qemu".to_string(),
                         AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
-                        _ => panic!("{}: unrecognised baseline: {}", Env::SYS_NAME, baseline),
+                        AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
+                        AvailableBaselines::Tdx => "kata-qemu-tdx".to_string(),
                     },
                 ),
             ]);
