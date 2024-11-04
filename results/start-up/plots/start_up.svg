@@ -119,27 +119,27 @@
 <text x="3" y="360" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000" transform="rotate(270, 3, 360)">
 Cold Start Latency [s]
 </text>
-<rect x="52" y="509" width="80" height="40" opacity="1" fill="#6666FF" stroke="none"/>
+<rect x="52" y="515" width="80" height="34" opacity="1" fill="#6666FF" stroke="none"/>
 <rect x="136" y="505" width="81" height="44" opacity="1" fill="#6666FF" stroke="none"/>
 <rect x="221" y="516" width="81" height="33" opacity="1" fill="#6666FF" stroke="none"/>
 <rect x="306" y="549" width="81" height="0" opacity="1" fill="#6666FF" stroke="none"/>
-<rect x="52" y="391" width="80" height="118" opacity="1" fill="#66FFB2" stroke="none"/>
+<rect x="52" y="491" width="80" height="24" opacity="1" fill="#66FFB2" stroke="none"/>
 <rect x="136" y="231" width="81" height="274" opacity="1" fill="#66FFB2" stroke="none"/>
 <rect x="221" y="230" width="81" height="286" opacity="1" fill="#66FFB2" stroke="none"/>
 <rect x="306" y="549" width="81" height="0" opacity="1" fill="#66FFB2" stroke="none"/>
-<rect x="52" y="390" width="80" height="1" opacity="1" fill="#FF66B2" stroke="none"/>
+<rect x="52" y="491" width="80" height="0" opacity="1" fill="#FF66B2" stroke="none"/>
 <rect x="136" y="230" width="81" height="1" opacity="1" fill="#FF66B2" stroke="none"/>
 <rect x="221" y="229" width="81" height="1" opacity="1" fill="#FF66B2" stroke="none"/>
 <rect x="306" y="549" width="81" height="0" opacity="1" fill="#FF66B2" stroke="none"/>
-<rect x="52" y="390" width="80" height="0" opacity="1" fill="#FF66B2" stroke="none"/>
+<rect x="52" y="490" width="80" height="1" opacity="1" fill="#FF66B2" stroke="none"/>
 <rect x="136" y="230" width="81" height="0" opacity="1" fill="#FF66B2" stroke="none"/>
 <rect x="221" y="229" width="81" height="0" opacity="1" fill="#FF66B2" stroke="none"/>
 <rect x="306" y="549" width="81" height="0" opacity="1" fill="#FF66B2" stroke="none"/>
-<rect x="52" y="387" width="80" height="3" opacity="1" fill="#FFFF66" stroke="none"/>
+<rect x="52" y="488" width="80" height="2" opacity="1" fill="#FFFF66" stroke="none"/>
 <rect x="136" y="85" width="81" height="145" opacity="1" fill="#FFFF66" stroke="none"/>
 <rect x="221" y="85" width="81" height="144" opacity="1" fill="#FFFF66" stroke="none"/>
 <rect x="306" y="549" width="81" height="0" opacity="1" fill="#FFFF66" stroke="none"/>
-<rect x="52" y="382" width="80" height="5" opacity="1" fill="#FFFF66" stroke="none"/>
+<rect x="52" y="483" width="80" height="5" opacity="1" fill="#FFFF66" stroke="none"/>
 <rect x="136" y="40" width="81" height="45" opacity="1" fill="#FFFF66" stroke="none"/>
 <rect x="221" y="41" width="81" height="44" opacity="1" fill="#FFFF66" stroke="none"/>
 <rect x="306" y="549" width="81" height="0" opacity="1" fill="#FFFF66" stroke="none"/>
