@@ -44,9 +44,10 @@ impl FromStr for AvailableBaselines {
 
 impl AvailableBaselines {
     pub fn iter_variants() -> std::slice::Iter<'static, AvailableBaselines> {
-        static VARIANTS: [AvailableBaselines; 3] = [
+        static VARIANTS: [AvailableBaselines; 4] = [
             AvailableBaselines::Kata,
             AvailableBaselines::Snp,
+            AvailableBaselines::SnpSc2,
             AvailableBaselines::Tdx,
         ];
         VARIANTS.iter()
