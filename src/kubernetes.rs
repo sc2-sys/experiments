@@ -16,9 +16,9 @@ impl K8s {
     fn get_kubectl_cmd() -> String {
         // For the moment, we literally run the `kubectl` command installed
         // as part of `coco-serverless`. We may change this in the future
-        match env::var("COCO_SOURCE") {
+        match env::var("SC2_DEPLOY_SOURCE") {
             Ok(value) => format!("{value}/bin/kubectl"),
-            Err(_) => panic!("invrs(eval): failed to read COCO_SOURCE env. var"),
+            Err(_) => panic!("invrs(eval): failed to read SC2_DEPLOY_SOURCE env. var"),
         }
     }
 

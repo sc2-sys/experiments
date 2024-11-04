@@ -13,16 +13,16 @@ pushd ${PROJ_ROOT}>>/dev/null
 export PROJ_ROOT=${PROJ_ROOT}
 export PS1="(sc2-exp) $PS1"
 
-alias sc2ctl="cargo run -q --"
+alias sc2-exp="cargo run -q --"
 
 # ----------------------------
-# Knative vars (TODO FIXME consider changing)
+# SC2 deployment variables
 # ----------------------------
 
-export COCO_SOURCE=~/git/coco-serverless/coco-serverless
-export KUBECONFIG=${COCO_SOURCE}/.config/kubeadm_kubeconfig
-alias k9s=${COCO_SOURCE}/bin/k9s
-alias kubectl=${COCO_SOURCE}/bin/kubectl
+export SC2_DEPLOY_SOURCE=~/git/sc2-sys/deploy
+export KUBECONFIG=${SC2_DEPLOY_SOURCE}/.config/kubeadm_kubeconfig
+alias k9s=${SC2_DEPLOY_SOURCE}/bin/k9s
+alias kubectl=${SC2_DEPLOY_SOURCE}/bin/kubectl
 
 # -----------------------------
 # Splash

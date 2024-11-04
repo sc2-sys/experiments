@@ -227,7 +227,7 @@ impl Plot {
             ))
             .unwrap();
 
-            x += 120;
+            x += 80;
         }
 
         // Manually draw the legend outside the grid, above the chart
