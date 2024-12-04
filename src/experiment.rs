@@ -15,6 +15,7 @@ pub enum AvailableBaselines {
     Snp,
     SnpSc2,
     Tdx,
+    TdxSc2,
 }
 
 impl fmt::Display for AvailableBaselines {
@@ -24,6 +25,7 @@ impl fmt::Display for AvailableBaselines {
             AvailableBaselines::Snp => write!(f, "snp"),
             AvailableBaselines::SnpSc2 => write!(f, "snp-sc2"),
             AvailableBaselines::Tdx => write!(f, "tdx"),
+            AvailableBaselines::TdxSc2 => write!(f, "tdx-sc2"),
         }
     }
 }
@@ -37,6 +39,7 @@ impl FromStr for AvailableBaselines {
             "snp" => Ok(AvailableBaselines::Snp),
             "snp-sc2" => Ok(AvailableBaselines::SnpSc2),
             "tdx" => Ok(AvailableBaselines::Tdx),
+            "tdx-sc2" => Ok(AvailableBaselines::TdxSc2),
             _ => Err(()),
         }
     }
@@ -44,11 +47,12 @@ impl FromStr for AvailableBaselines {
 
 impl AvailableBaselines {
     pub fn iter_variants() -> std::slice::Iter<'static, AvailableBaselines> {
-        static VARIANTS: [AvailableBaselines; 4] = [
+        static VARIANTS: [AvailableBaselines; 5] = [
             AvailableBaselines::Kata,
             AvailableBaselines::Snp,
             AvailableBaselines::SnpSc2,
             AvailableBaselines::Tdx,
+            AvailableBaselines::TdxSc2,
         ];
         VARIANTS.iter()
     }
@@ -59,6 +63,7 @@ impl AvailableBaselines {
             AvailableBaselines::Snp => RGBColor(203, 170, 203),
             AvailableBaselines::SnpSc2 => RGBColor(213, 160, 163),
             AvailableBaselines::Tdx => RGBColor(255, 255, 181),
+            AvailableBaselines::TdxSc2 => RGBColor(205, 255, 101),
         }
     }
 }
@@ -374,6 +379,7 @@ impl Exp {
                         AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
                         AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
                         AvailableBaselines::Tdx => "kata-qemu-tdx".to_string(),
+                        AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
                     },
                 ),
             ]);

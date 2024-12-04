@@ -109,12 +109,6 @@ impl Plot {
                 .insert("Orchestration", orchestration_time);
         }
 
-        // FIXME(tdx): must manually add Orchestration for TDX as we cannot
-        // run the experiments yet
-        data.get_mut(&AvailableBaselines::Tdx)
-            .unwrap()
-            .insert("Orchestration", 0.0);
-
         // ---------- Plot Data ---------- //
 
         for (baseline, times) in data.iter() {
@@ -129,16 +123,19 @@ impl Plot {
         fs::create_dir_all(plot_path.clone()).unwrap();
         plot_path.push(format!("{}.svg", exp.to_string().replace("-", "_")));
 
-        let root = SVGBackend::new(&plot_path, (400, 600)).into_drawing_area();
+        let chart_height_px = 600;
+        let chart_width_px = 400;
+        let root =
+            SVGBackend::new(&plot_path, (chart_height_px, chart_width_px)).into_drawing_area();
         root.fill(&WHITE).unwrap();
 
-        let x_max = AvailableBaselines::iter_variants().len();
+        let x_max = AvailableBaselines::iter_variants().len() as f64;
         let mut chart = ChartBuilder::on(&root)
             .x_label_area_size(40)
             .y_label_area_size(40)
             .margin(10)
             .margin_top(40)
-            .build_cartesian_2d(0..x_max, 0f64..(y_max / 1000.0))
+            .build_cartesian_2d(0.0..x_max, 0f64..(y_max / 1000.0))
             .unwrap();
 
         chart
@@ -154,7 +151,7 @@ impl Plot {
         // Manually draw the y-axis label with a custom font and size
         root.draw(&Text::new(
             "Cold Start Latency [s]",
-            (3, 360),
+            (3, 280),
             ("sans-serif", 20)
                 .into_font()
                 .transform(FontTransform::Rotate270)
@@ -185,8 +182,10 @@ impl Plot {
                     let prev_y = prev_y_map.get_mut(baseline).unwrap();
                     this_y /= 1000.0;
 
-                    let mut bar =
-                        Rectangle::new([(x, *prev_y), (x + 1, *prev_y + this_y)], bar_style);
+                    let mut bar = Rectangle::new(
+                        [(x as f64, *prev_y), (x as f64 + 1.0, *prev_y + this_y)],
+                        bar_style,
+                    );
                     *prev_y += this_y;
 
                     bar.set_margin(0, 0, 2, 2);
@@ -196,11 +195,34 @@ impl Plot {
         }
 
         // Consider adding another series in black without fill (for the frame)
+        chart
+            .draw_series((0..).zip(data.iter()).map(|(x, (baseline, _))| {
+                // Benefit from the fact that prev_y stores the maximum y
+                // value after we plot the stacked bar chart
+                let this_y = *prev_y_map.get_mut(baseline).unwrap();
+
+                let margin_px = 2;
+                let x_axis_range = 0.0..x_max;
+                let margin_units = margin_px as f64 * (x_axis_range.end - x_axis_range.start)
+                    / chart_width_px as f64;
+
+                PathElement::new(
+                    vec![
+                        (x as f64 + margin_units, this_y),
+                        (x as f64 - margin_units + 1.0, this_y),
+                        (x as f64 - margin_units + 1.0, 0.0),
+                        (x as f64 + margin_units, 0.0),
+                        (x as f64 + margin_units, this_y),
+                    ],
+                    BLACK,
+                )
+            }))
+            .unwrap();
 
         // Add solid frames
         chart
             .plotting_area()
-            .draw(&PathElement::new(vec![(0, y_max), (x_max, y_max)], BLACK))
+            .draw(&PathElement::new(vec![(0.0, y_max), (x_max, y_max)], BLACK))
             .unwrap();
         chart
             .plotting_area()
@@ -212,29 +234,36 @@ impl Plot {
         chart
             .plotting_area()
             .draw(&PathElement::new(
-                vec![(0, 0 as f64), (x_max, 0 as f64)],
+                vec![(0.0, 0 as f64), (x_max, 0 as f64)],
                 BLACK,
             ))
             .unwrap();
 
         // Manually draw the x-axis labels with a custom font and size
-        let mut x = 85;
+        fn xaxis_pos_for_baseline(baseline: &AvailableBaselines) -> i32 {
+            match baseline {
+                AvailableBaselines::Kata => 100,
+                AvailableBaselines::Snp => 200,
+                AvailableBaselines::SnpSc2 => 300,
+                AvailableBaselines::Tdx => 400,
+                AvailableBaselines::TdxSc2 => 500,
+            }
+        }
+
         for (_, baseline) in (0..).zip(AvailableBaselines::iter_variants()) {
             root.draw(&Text::new(
                 format!("{baseline}"),
-                (x, 560),
+                (xaxis_pos_for_baseline(baseline), 360),
                 ("sans-serif", 20).into_font().color(&BLACK),
             ))
             .unwrap();
-
-            x += 80;
         }
 
         // Manually draw the legend outside the grid, above the chart
         let legend_labels = vec!["create-vm", "pull-image"];
 
         fn legend_pos_for_label(label: &str) -> (i32, i32) {
-            let legend_x_start = 70;
+            let legend_x_start = 170;
             let legend_y_pos = 6;
 
             match label {
