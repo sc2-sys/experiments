@@ -63,7 +63,7 @@ impl AvailableBaselines {
 
     pub fn get_color(&self) -> RGBColor {
         match self {
-            AvailableBaselines::Runc => RGBColor(122, 092, 117),
+            AvailableBaselines::Runc => RGBColor(122, 92, 117),
             AvailableBaselines::Kata => RGBColor(171, 222, 230),
             AvailableBaselines::Snp => RGBColor(203, 170, 203),
             AvailableBaselines::SnpSc2 => RGBColor(213, 160, 163),
