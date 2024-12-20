@@ -28,6 +28,7 @@ jobs:
       - name: "Fix rust version"
         run: |
           rustup default 1.83.0
+          rustup component add clippy
           rustup component add rustfmt
       - name: "Run cargo fmt check"
         run: cargo fmt --all -- --check
