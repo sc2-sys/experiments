@@ -11,6 +11,7 @@ use std::{
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
 pub enum AvailableBaselines {
+    Runc,
     Kata,
     Snp,
     SnpSc2,
@@ -21,6 +22,7 @@ pub enum AvailableBaselines {
 impl fmt::Display for AvailableBaselines {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            AvailableBaselines::Runc => write!(f, "runc"),
             AvailableBaselines::Kata => write!(f, "kata"),
             AvailableBaselines::Snp => write!(f, "snp"),
             AvailableBaselines::SnpSc2 => write!(f, "snp-sc2"),
@@ -35,6 +37,7 @@ impl FromStr for AvailableBaselines {
 
     fn from_str(input: &str) -> Result<AvailableBaselines, Self::Err> {
         match input {
+            "runc" => Ok(AvailableBaselines::Runc),
             "kata" => Ok(AvailableBaselines::Kata),
             "snp" => Ok(AvailableBaselines::Snp),
             "snp-sc2" => Ok(AvailableBaselines::SnpSc2),
@@ -47,7 +50,8 @@ impl FromStr for AvailableBaselines {
 
 impl AvailableBaselines {
     pub fn iter_variants() -> std::slice::Iter<'static, AvailableBaselines> {
-        static VARIANTS: [AvailableBaselines; 5] = [
+        static VARIANTS: [AvailableBaselines; 6] = [
+            AvailableBaselines::Runc,
             AvailableBaselines::Kata,
             AvailableBaselines::Snp,
             AvailableBaselines::SnpSc2,
@@ -59,6 +63,7 @@ impl AvailableBaselines {
 
     pub fn get_color(&self) -> RGBColor {
         match self {
+            AvailableBaselines::Runc => RGBColor(122, 92, 117),
             AvailableBaselines::Kata => RGBColor(171, 222, 230),
             AvailableBaselines::Snp => RGBColor(203, 170, 203),
             AvailableBaselines::SnpSc2 => RGBColor(213, 160, 163),
@@ -375,6 +380,7 @@ impl Exp {
                 (
                     "RUNTIME_CLASS_NAME",
                     match baseline {
+                        AvailableBaselines::Runc => "runc".to_string(),
                         AvailableBaselines::Kata => "kata-qemu".to_string(),
                         AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
                         AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),

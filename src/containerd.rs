@@ -67,13 +67,14 @@ impl Containerd {
         );
 
         // Load the journalctl output into a buffer reader
-        let journalctl = Command::new("sudo")
+        let mut journalctl = Command::new("sudo")
             .args(["journalctl", "-xeu", "containerd", "-o", "json"])
             .stdout(Stdio::piped())
             .spawn()
             .unwrap();
         let stdout = journalctl
             .stdout
+            .take()
             .ok_or("sc2-exp: failed to open journalctl stdout")
             .unwrap();
         let reader = BufReader::new(stdout);
@@ -234,6 +235,11 @@ impl Containerd {
                 }
             }
         }
+
+        // Wait on the process to silent clippy warning
+        journalctl
+            .wait()
+            .expect("Failed to wait on journalctl process");
 
         debug!(
             "{}(containerd): got a total of {} events",

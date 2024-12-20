@@ -1,7 +1,7 @@
 ## Start-Up Experimnet
 
 This experiment measures the start-up latency of a simple Knative service. It
-compares SC2 with Kata and SEV-SNP.
+compares SC2 with runc, and Kata-Qemu plain and with SEV-SNP and TDX.
 
 Once you have a working SC2 cluster, you may run the experiment using:
 

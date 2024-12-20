@@ -115,8 +115,20 @@ impl K8s {
             .wait_with_output()
             .expect("sc2-exp(k8s): failed to read envsubst result");
 
-        String::from_utf8(result.stdout)
-            .expect("sc2-exp(k8s): failed to convert envsubst output to string")
+        let result_str = String::from_utf8(result.stdout)
+            .expect("sc2-exp(k8s): failed to convert envsubst output to string");
+
+        // If running the `runc` baseline, we must drop the runtime class line
+        // altogether
+        if env_vars.get("RUNTIME_CLASS_NAME").unwrap() == "runc" {
+            return result_str
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("runtimeClassName"))
+                .collect::<Vec<_>>()
+                .join("\n");
+        }
+
+        result_str
     }
 
     fn get_knative_service_ip(service_name: &str) -> String {
