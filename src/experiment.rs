@@ -1,4 +1,4 @@
-use crate::{containerd::Containerd, env::Env, kubernetes::K8s};
+use crate::{containerd::Containerd, cri::Cri, env::Env, kubernetes::K8s};
 use chrono::{DateTime, Duration, Utc};
 use clap::{Args, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -85,6 +85,7 @@ pub struct ExpRunArgs {
     scale_up_range: u32,
 }
 
+#[derive(PartialEq)]
 pub enum AvailableExperiments {
     ScaleOut,
     StartUp,
@@ -205,8 +206,7 @@ impl Exp {
     /// Helper function to get a progress bar to visualize experiment progress
     fn get_progress_bar(
         num_repeats: u64,
-        exp: &AvailableExperiments,
-        baseline: &AvailableBaselines,
+        msg: String,
     ) -> ProgressBar {
         let pb = ProgressBar::new(num_repeats);
         pb.set_style(
@@ -215,7 +215,7 @@ impl Exp {
                 .expect("sc2-eval(k8s): error creating progress bar")
                 .progress_chars("#>-"),
         );
-        pb.set_message(format!("{exp}/{baseline}"));
+        pb.set_message(msg);
         pb
     }
 
@@ -290,6 +290,15 @@ impl Exp {
         exec_result
     }
 
+    fn clean_up_after_run(exp: &AvailableExperiments, env_vars: &BTreeMap<&str, String>) {
+        if exp == &AvailableExperiments::StartUp && env_vars["START_UP_FLAVOUR"] == "cold" {
+            Cri::remove_image(format!(
+                "{}/helloworld-py:unencrypted",
+                env_vars["CTR_REGISTRY_URL"]
+            ));
+        }
+    }
+
     /// This method takes a _single_ deployment configuration, specified as
     /// a YAML file and a map of env. vars to template it, and executes it
     /// according to the requested experiment, using the given run args
@@ -315,7 +324,10 @@ impl Exp {
                 format!("{}_{}.csv", env_vars["SC2_BASELINE"], env_vars["SCALE_IDX"])
             }
             AvailableExperiments::StartUp => {
-                format!("{}.csv", env_vars["SC2_BASELINE"])
+                format!(
+                    "{}_{}.csv",
+                    env_vars["SC2_BASELINE"], env_vars["START_UP_FLAVOUR"]
+                )
             }
         });
         Self::init_data_file(&results_file, exp);
@@ -323,18 +335,26 @@ impl Exp {
         // Run the experiment (warm-up)
         for _ in 0..args.num_warmup_repeats {
             Self::run_knative_experiment_once(exp, &env_vars["KSERVICE_NAME"], &service_ip);
+            Self::clean_up_after_run(exp, env_vars);
         }
 
         // Run the actual experiment
         let pb = Self::get_progress_bar(
             args.num_repeats.into(),
-            exp,
-            &<AvailableBaselines as FromStr>::from_str(&env_vars["SC2_BASELINE"]).unwrap(),
+            match &exp {
+                AvailableExperiments::ScaleOut => {
+                    format!("{}/{}/{}", exp, env_vars["SC2_BASELINE"], env_vars["SCALE_IDX"])
+                }
+                AvailableExperiments::StartUp => {
+                    format!("{}/{}/{}", exp, env_vars["SC2_BASELINE"], env_vars["START_UP_FLAVOUR"])
+                }
+            },
         );
         for i in 0..args.num_repeats {
             // Run experiment
             let mut exec_results =
                 Self::run_knative_experiment_once(exp, &env_vars["KSERVICE_NAME"], &service_ip);
+            Self::clean_up_after_run(exp, env_vars);
 
             // Write results to file
             exec_results.iter = i;
@@ -401,7 +421,10 @@ impl Exp {
                 }
                 AvailableExperiments::StartUp => {
                     env_vars.insert("KSERVICE_NAME", "helloworld-py".to_string());
-                    Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
+                    for flavour in ["cold", "warm"] {
+                        env_vars.insert("START_UP_FLAVOUR", flavour.to_string());
+                        Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
+                    }
                 }
             };
         }

@@ -16,21 +16,21 @@ pub struct Containerd {}
 impl Containerd {
     // TODO: consider making this typed, or at least using the same strings
     // below
-    pub const CONTAINERD_INFO_EVENTS: [&'static str; 6] = [
-        // This event is an additional one that we include with the end-to-end
-        // execution time. It does not come from containerd's journal
-        "StartUp",
-        "RunPodSandbox",
+    pub const CONTAINERD_INFO_EVENTS: [&'static str; 7] = [
+        "StartUp", // Fake event that we add to measure end-to-end time
+        "RunPodSandbox", // This event captures the time to start the sandbox
+        "PullImage", // This event captures the time to pull an image in the host
         "CreateContainerUserContainer",
         "CreateContainerQueueProxy",
-        "StartContainerUserContainer",
-        "StartContainerQueueProxy",
+        "StartContainerUserContainer", // For CoCo: pull app image in the guest
+        "StartContainerQueueProxy", // For CoCo: pull proxy image in the guest
     ];
 
     pub fn get_color_for_event(event: &str) -> RGBColor {
         match event {
             "StartUp" => RGBColor(102, 102, 255),
             "RunPodSandbox" => RGBColor(102, 255, 178),
+            "PullImage" => RGBColor(245, 161, 66),
             "CreateContainerUserContainer" => RGBColor(255, 102, 178),
             "CreateContainerQueueProxy" => RGBColor(255, 102, 178),
             "StartContainerUserContainer" => RGBColor(255, 255, 102),
@@ -84,6 +84,7 @@ impl Containerd {
 
         // Helper start timestamps for different events
         let mut run_sandbox_start: Option<DateTime<Utc>> = None;
+        let mut pull_image_start: Option<DateTime<Utc>> = None;
         let mut user_container_start: Option<DateTime<Utc>> = None;
         let mut queue_proxy_start: Option<DateTime<Utc>> = None;
         let mut user_container_create: Option<DateTime<Utc>> = None;
@@ -137,6 +138,22 @@ impl Containerd {
                         }
                         continue;
                     }
+                }
+
+                // ---------- PullImage ----------
+
+                if pull_image_start.is_none()
+                    && message.contains("PullImage")
+                {
+                    pull_image_start = Some(timestamp);
+                    continue;
+                }
+
+                if message.contains("PullImage") && message.contains("returns image reference") && !pull_image_start.is_none() {
+                    if let (Some(start), Some(end)) = (pull_image_start, Some(timestamp)) {
+                        ts_map.insert("PullImage".to_string(), (start, end));
+                    }
+                    continue;
                 }
 
                 // ---------- CreateContainer ----------
@@ -246,7 +263,7 @@ impl Containerd {
             Env::SYS_NAME,
             ts_map.len()
         );
-        let num_expected_events = 5;
+        let num_expected_events = 6;
         if ts_map.len() != num_expected_events {
             warn!("{}(containerd): expected {num_expected_events} journalctl events for '{deployment_id}' but got {}",
                   Env::SYS_NAME,

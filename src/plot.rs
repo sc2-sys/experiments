@@ -46,13 +46,21 @@ impl Plot {
         // of each event and the average time spent in each event.
         // Note: we stack averages together, which may not be the most
         // statistically-wise thing.
-        let mut data = BTreeMap::<AvailableBaselines, BTreeMap<&str, f64>>::new();
+        let mut cold_data = BTreeMap::<AvailableBaselines, BTreeMap<&str, f64>>::new();
         for workflow in AvailableBaselines::iter_variants() {
             let mut inner_map = BTreeMap::<&str, f64>::new();
             for event in Containerd::CONTAINERD_INFO_EVENTS {
                 inner_map.insert(event, 0.0);
             }
-            data.insert(workflow.clone(), inner_map);
+            cold_data.insert(workflow.clone(), inner_map);
+        }
+        let mut warm_data = BTreeMap::<AvailableBaselines, BTreeMap<&str, f64>>::new();
+        for workflow in AvailableBaselines::iter_variants() {
+            let mut inner_map = BTreeMap::<&str, f64>::new();
+            for event in Containerd::CONTAINERD_INFO_EVENTS {
+                inner_map.insert(event, 0.0);
+            }
+            warm_data.insert(workflow.clone(), inner_map);
         }
 
         let mut y_max: f64 = 25.0e3;
@@ -63,7 +71,25 @@ impl Plot {
                 .unwrap_or_default();
             let file_name_len = file_name.len();
             let file_name_no_ext = &file_name[0..file_name_len - 4];
-            let baseline: AvailableBaselines = file_name_no_ext.parse().unwrap();
+            let baseline: AvailableBaselines = file_name_no_ext
+                .split('_')
+                .collect::<Vec<_>>()[0]
+                .parse()
+                .unwrap();
+            let flavour: String = file_name_no_ext
+                .split('_')
+                .collect::<Vec<_>>()[1]
+                .parse()
+                .unwrap();
+
+            // Based on the flavour, we pick one of the data dictionaries
+            let data = match flavour.as_str() {
+                "cold" => &mut cold_data,
+                "warm" => &mut warm_data,
+                _ => panic!("unreachable"),
+            };
+
+            debug!("Reading data for baseline: {baseline}/{flavour} (file: {csv_file:?}");
 
             // Open the CSV and deserialize records
             let mut reader = ReaderBuilder::new()
@@ -81,6 +107,7 @@ impl Plot {
                     .get_mut(record.event.as_str())
                     .unwrap();
                 *this_event += record.time_ms as f64;
+
                 count += 1;
             }
 
@@ -107,13 +134,21 @@ impl Plot {
             data.get_mut(&baseline)
                 .unwrap()
                 .insert("Orchestration", orchestration_time);
-        }
+        } // End processing one CSV file
 
         // ---------- Plot Data ---------- //
 
-        for (baseline, times) in data.iter() {
-            for (event, avg) in times.iter() {
-                debug!("{baseline}/{event}: {avg} ms");
+        for flavour in ["cold", "warm"] {
+            let data = match flavour {
+                "cold" => cold_data.clone(),
+                "warm" => warm_data.clone(),
+                _ => panic!("unreachable")
+            };
+
+            for (baseline, times) in data.iter() {
+                for (event, avg) in times.iter() {
+                    debug!("{baseline}/{flavour}/{event}: {avg} ms");
+                }
             }
         }
 
@@ -151,7 +186,7 @@ impl Plot {
 
         // Manually draw the y-axis label with a custom font and size
         root.draw(&Text::new(
-            "Cold Start Latency [s]",
+            "Start-Up Latency [s]",
             (3, 280),
             ("sans-serif", 20)
                 .into_font()
@@ -160,67 +195,74 @@ impl Plot {
         ))
         .unwrap();
 
-        // Draw bars: we draw one series for each event, and we stack them
-        // together
-        let mut prev_y_map: BTreeMap<&AvailableBaselines, f64> = BTreeMap::new();
-        for baseline in AvailableBaselines::iter_variants() {
-            prev_y_map.insert(baseline, 0.0);
-        }
-        for event in Containerd::CONTAINERD_INFO_EVENTS {
+        let bar_width = 0.5;
+        for (data_idx, data) in (0..).zip([cold_data.clone(), warm_data.clone()]) {
+            // Draw bars: we draw one series for each event, and we stack them
+            // together
+            let mut prev_y_map: BTreeMap<&AvailableBaselines, f64> = BTreeMap::new();
+            for baseline in AvailableBaselines::iter_variants() {
+                prev_y_map.insert(baseline, 0.0);
+            }
+
+            for event in Containerd::CONTAINERD_INFO_EVENTS {
+                chart
+                    .draw_series((0..).zip(data.iter()).map(|(x, (baseline, event_vec))| {
+                        let bar_style = ShapeStyle {
+                            color: Containerd::get_color_for_event(event).into(),
+                            filled: true,
+                            stroke_width: 2,
+                        };
+
+                        // Handle the StartUp case separately
+                        let mut this_y = *event_vec.get(event).unwrap();
+                        if event == "StartUp" {
+                            this_y = *event_vec.get("Orchestration").unwrap();
+                        }
+                        let prev_y = prev_y_map.get_mut(baseline).unwrap();
+                        this_y /= 1000.0;
+
+                        let x_orig: f64 = x as f64 + 0.5 * data_idx as f64;
+
+                        let mut bar = Rectangle::new(
+                            [(x_orig, *prev_y), (x_orig + bar_width, *prev_y + this_y)],
+                            bar_style,
+                        );
+                        *prev_y += this_y;
+
+                        bar.set_margin(0, 0, 2, 2);
+                        bar
+                    }))
+                    .unwrap();
+            }
+
+            // Add black frame around each bar
             chart
-                .draw_series((0..).zip(data.iter()).map(|(x, (baseline, event_vec))| {
-                    let bar_style = ShapeStyle {
-                        color: Containerd::get_color_for_event(event).into(),
-                        filled: true,
-                        stroke_width: 2,
-                    };
+                .draw_series((0..).zip(data.iter()).map(|(x, (baseline, _))| {
+                    // Benefit from the fact that prev_y stores the maximum y
+                    // value after we plot the stacked bar chart
+                    let this_y = *prev_y_map.get_mut(baseline).unwrap();
 
-                    // Handle the StartUp case separately
-                    let mut this_y = *event_vec.get(event).unwrap();
-                    if event == "StartUp" {
-                        this_y = *event_vec.get("Orchestration").unwrap();
-                    }
-                    let prev_y = prev_y_map.get_mut(baseline).unwrap();
-                    this_y /= 1000.0;
+                    let x_orig: f64 = x as f64 + 0.5 * data_idx as f64;
+                    let margin_px = 2;
+                    let x_axis_range = 0.0..x_max;
+                    let margin_units = margin_px as f64 * (x_axis_range.end - x_axis_range.start)
+                        / chart_width_px as f64;
 
-                    let mut bar = Rectangle::new(
-                        [(x as f64, *prev_y), (x as f64 + 1.0, *prev_y + this_y)],
-                        bar_style,
-                    );
-                    *prev_y += this_y;
-
-                    bar.set_margin(0, 0, 2, 2);
-                    bar
+                    PathElement::new(
+                        vec![
+                            (x_orig + margin_units, this_y),
+                            (x_orig - margin_units + bar_width, this_y),
+                            (x_orig - margin_units + bar_width, 0.0),
+                            (x_orig + margin_units, 0.0),
+                            (x_orig + margin_units, this_y),
+                        ],
+                        BLACK,
+                    )
                 }))
                 .unwrap();
         }
 
-        // Consider adding another series in black without fill (for the frame)
-        chart
-            .draw_series((0..).zip(data.iter()).map(|(x, (baseline, _))| {
-                // Benefit from the fact that prev_y stores the maximum y
-                // value after we plot the stacked bar chart
-                let this_y = *prev_y_map.get_mut(baseline).unwrap();
-
-                let margin_px = 2;
-                let x_axis_range = 0.0..x_max;
-                let margin_units = margin_px as f64 * (x_axis_range.end - x_axis_range.start)
-                    / chart_width_px as f64;
-
-                PathElement::new(
-                    vec![
-                        (x as f64 + margin_units, this_y),
-                        (x as f64 - margin_units + 1.0, this_y),
-                        (x as f64 - margin_units + 1.0, 0.0),
-                        (x as f64 + margin_units, 0.0),
-                        (x as f64 + margin_units, this_y),
-                    ],
-                    BLACK,
-                )
-            }))
-            .unwrap();
-
-        // Add solid frames
+        // Add solid frames around grid
         chart
             .plotting_area()
             .draw(&PathElement::new(vec![(0.0, y_max), (x_max, y_max)], BLACK))
@@ -262,16 +304,17 @@ impl Plot {
         }
 
         // Manually draw the legend outside the grid, above the chart
-        let legend_labels = vec!["control-plane", "create-vm", "pull-image"];
+        let legend_labels = vec!["control-plane", "create-vm", "pull-image-host", "pull-image-guest"];
 
         fn legend_pos_for_label(label: &str) -> (i32, i32) {
-            let legend_x_start = 110;
+            let legend_x_start = 10;
             let legend_y_pos = 6;
 
             match label {
                 "control-plane" => (legend_x_start, legend_y_pos),
-                "create-vm" => (legend_x_start + 150, legend_y_pos),
-                "pull-image" => (legend_x_start + 280, legend_y_pos),
+                "create-vm" => (legend_x_start + 50, legend_y_pos),
+                "pull-image-host" => (legend_x_start + 180, legend_y_pos),
+                "pull-image-guest" => (legend_x_start + 280, legend_y_pos),
                 _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
             }
         }
@@ -280,7 +323,8 @@ impl Plot {
             match label {
                 "control-plane" => Containerd::get_color_for_event("StartUp"),
                 "create-vm" => Containerd::get_color_for_event("RunPodSandbox"),
-                "pull-image" => Containerd::get_color_for_event("StartContainerUserContainer"),
+                "pull-image-host" => Containerd::get_color_for_event("PullImage"),
+                "pull-image-guest" => Containerd::get_color_for_event("StartContainerUserContainer"),
                 _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
             }
         }
