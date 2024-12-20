@@ -237,7 +237,9 @@ impl Containerd {
         }
 
         // Wait on the process to silent clippy warning
-        journalctl.wait().expect("Failed to wait on journalctl process");
+        journalctl
+            .wait()
+            .expect("Failed to wait on journalctl process");
 
         debug!(
             "{}(containerd): got a total of {} events",
