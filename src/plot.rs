@@ -55,7 +55,7 @@ impl Plot {
             data.insert(workflow.clone(), inner_map);
         }
 
-        let mut y_max: f64 = 0.0;
+        let mut y_max: f64 = 25.0e3;
         for csv_file in data_files {
             let file_name = csv_file
                 .file_name()
@@ -142,6 +142,7 @@ impl Plot {
             .configure_mesh()
             .y_label_style(("sans-serif", 20).into_font())
             .y_labels(10)
+            .y_max_light_lines(5)
             .disable_x_mesh()
             .disable_x_axis()
             .y_label_formatter(&|y| format!("{:.0}", y))
@@ -242,11 +243,12 @@ impl Plot {
         // Manually draw the x-axis labels with a custom font and size
         fn xaxis_pos_for_baseline(baseline: &AvailableBaselines) -> i32 {
             match baseline {
-                AvailableBaselines::Kata => 100,
-                AvailableBaselines::Snp => 200,
-                AvailableBaselines::SnpSc2 => 300,
-                AvailableBaselines::Tdx => 400,
-                AvailableBaselines::TdxSc2 => 500,
+                AvailableBaselines::Runc => 80,
+                AvailableBaselines::Kata => 180,
+                AvailableBaselines::Snp => 260,
+                AvailableBaselines::SnpSc2 => 340,
+                AvailableBaselines::Tdx => 445,
+                AvailableBaselines::TdxSc2 => 520,
             }
         }
 
@@ -260,21 +262,23 @@ impl Plot {
         }
 
         // Manually draw the legend outside the grid, above the chart
-        let legend_labels = vec!["create-vm", "pull-image"];
+        let legend_labels = vec!["control-plane", "create-vm", "pull-image"];
 
         fn legend_pos_for_label(label: &str) -> (i32, i32) {
-            let legend_x_start = 170;
+            let legend_x_start = 110;
             let legend_y_pos = 6;
 
             match label {
-                "create-vm" => (legend_x_start, legend_y_pos),
-                "pull-image" => (legend_x_start + 150, legend_y_pos),
+                "control-plane" => (legend_x_start, legend_y_pos),
+                "create-vm" => (legend_x_start + 150, legend_y_pos),
+                "pull-image" => (legend_x_start + 280, legend_y_pos),
                 _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
             }
         }
 
         fn legend_color_for_label(label: &str) -> RGBColor {
             match label {
+                "control-plane" => Containerd::get_color_for_event("StartUp"),
                 "create-vm" => Containerd::get_color_for_event("RunPodSandbox"),
                 "pull-image" => Containerd::get_color_for_event("StartContainerUserContainer"),
                 _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
