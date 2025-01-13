@@ -307,14 +307,14 @@ impl Plot {
         let legend_labels = vec!["control-plane", "create-vm", "pull-image-host", "pull-image-guest"];
 
         fn legend_pos_for_label(label: &str) -> (i32, i32) {
-            let legend_x_start = 10;
+            let legend_x_start = 20;
             let legend_y_pos = 6;
 
             match label {
                 "control-plane" => (legend_x_start, legend_y_pos),
-                "create-vm" => (legend_x_start + 50, legend_y_pos),
-                "pull-image-host" => (legend_x_start + 180, legend_y_pos),
-                "pull-image-guest" => (legend_x_start + 280, legend_y_pos),
+                "create-vm" => (legend_x_start + 140, legend_y_pos),
+                "pull-image-host" => (legend_x_start + 255, legend_y_pos),
+                "pull-image-guest" => (legend_x_start + 410, legend_y_pos),
                 _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
             }
         }

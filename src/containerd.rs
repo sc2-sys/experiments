@@ -23,7 +23,7 @@ impl Containerd {
         "CreateContainerUserContainer",
         "CreateContainerQueueProxy",
         "StartContainerUserContainer", // For CoCo: pull app image in the guest
-        "StartContainerQueueProxy", // For CoCo: pull proxy image in the guest
+        "StartContainerQueueProxy", // For CoCo: pull sidecar image in the guest
     ];
 
     pub fn get_color_for_event(event: &str) -> RGBColor {
