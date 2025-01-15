@@ -3,6 +3,7 @@ use crate::plot::Plot;
 use clap::{Parser, Subcommand};
 
 pub mod containerd;
+pub mod cri;
 pub mod env;
 pub mod experiment;
 pub mod kubernetes;
