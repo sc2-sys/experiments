@@ -264,7 +264,13 @@ impl Containerd {
             ts_map.len()
         );
         let num_expected_events = 6;
-        if ts_map.len() != num_expected_events {
+        if ts_map.len() == (num_expected_events - 1) && pull_image_start.is_none() {
+            // Warm Knative starts do not report the PullImage event, so we
+            // add it here with the same start/end timestamp so that it reports
+            // a time of 0
+            debug!("{}(containerd): warm execution misses PullImage event", Env::SYS_NAME);
+            ts_map.insert("PullImage".to_string(), (run_sandbox_start.unwrap(), run_sandbox_start.unwrap()));
+        } else if ts_map.len() != num_expected_events {
             warn!("{}(containerd): expected {num_expected_events} journalctl events for '{deployment_id}' but got {}",
                   Env::SYS_NAME,
                   ts_map.len());
