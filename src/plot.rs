@@ -71,14 +71,10 @@ impl Plot {
                 .unwrap_or_default();
             let file_name_len = file_name.len();
             let file_name_no_ext = &file_name[0..file_name_len - 4];
-            let baseline: AvailableBaselines = file_name_no_ext
-                .split('_')
-                .collect::<Vec<_>>()[0]
+            let baseline: AvailableBaselines = file_name_no_ext.split('_').collect::<Vec<_>>()[0]
                 .parse()
                 .unwrap();
-            let flavour: String = file_name_no_ext
-                .split('_')
-                .collect::<Vec<_>>()[1]
+            let flavour: String = file_name_no_ext.split('_').collect::<Vec<_>>()[1]
                 .parse()
                 .unwrap();
 
@@ -142,7 +138,7 @@ impl Plot {
             let data = match flavour {
                 "cold" => cold_data.clone(),
                 "warm" => warm_data.clone(),
-                _ => panic!("unreachable")
+                _ => panic!("unreachable"),
             };
 
             for (baseline, times) in data.iter() {
@@ -210,7 +206,7 @@ impl Plot {
                         let this_color = if data_idx == 0 {
                             Containerd::get_color_for_event(event).into()
                         } else {
-                            Containerd::get_color_for_event(event).mix(0.6).into()
+                            Containerd::get_color_for_event(event).mix(0.6)
                         };
                         let bar_style = ShapeStyle {
                             color: this_color,
@@ -329,7 +325,12 @@ impl Plot {
         }
 
         // Manually draw the legend outside the grid, above the chart
-        let legend_labels = vec!["control-plane", "create-vm", "pull-image-host", "pull-image-guest"];
+        let legend_labels = vec![
+            "control-plane",
+            "create-vm",
+            "pull-image-host",
+            "pull-image-guest",
+        ];
 
         fn legend_pos_for_label(label: &str) -> (i32, i32) {
             let legend_x_start = 20;
@@ -349,7 +350,9 @@ impl Plot {
                 "control-plane" => Containerd::get_color_for_event("StartUp"),
                 "create-vm" => Containerd::get_color_for_event("RunPodSandbox"),
                 "pull-image-host" => Containerd::get_color_for_event("PullImage"),
-                "pull-image-guest" => Containerd::get_color_for_event("StartContainerUserContainer"),
+                "pull-image-guest" => {
+                    Containerd::get_color_for_event("StartContainerUserContainer")
+                }
                 _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
             }
         }

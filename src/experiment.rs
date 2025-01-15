@@ -204,10 +204,7 @@ impl Exp {
     }
 
     /// Helper function to get a progress bar to visualize experiment progress
-    fn get_progress_bar(
-        num_repeats: u64,
-        msg: String,
-    ) -> ProgressBar {
+    fn get_progress_bar(num_repeats: u64, msg: String) -> ProgressBar {
         let pb = ProgressBar::new(num_repeats);
         pb.set_style(
             ProgressStyle::default_bar()
@@ -343,10 +340,16 @@ impl Exp {
             args.num_repeats.into(),
             match &exp {
                 AvailableExperiments::ScaleOut => {
-                    format!("{}/{}/{}", exp, env_vars["SC2_BASELINE"], env_vars["SCALE_IDX"])
+                    format!(
+                        "{}/{}/{}",
+                        exp, env_vars["SC2_BASELINE"], env_vars["SCALE_IDX"]
+                    )
                 }
                 AvailableExperiments::StartUp => {
-                    format!("{}/{}/{}", exp, env_vars["SC2_BASELINE"], env_vars["START_UP_FLAVOUR"])
+                    format!(
+                        "{}/{}/{}",
+                        exp, env_vars["SC2_BASELINE"], env_vars["START_UP_FLAVOUR"]
+                    )
                 }
             },
         );

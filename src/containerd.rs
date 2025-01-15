@@ -17,13 +17,13 @@ impl Containerd {
     // TODO: consider making this typed, or at least using the same strings
     // below
     pub const CONTAINERD_INFO_EVENTS: [&'static str; 7] = [
-        "StartUp", // Fake event that we add to measure end-to-end time
+        "StartUp",       // Fake event that we add to measure end-to-end time
         "RunPodSandbox", // This event captures the time to start the sandbox
-        "PullImage", // This event captures the time to pull an image in the host
+        "PullImage",     // This event captures the time to pull an image in the host
         "CreateContainerUserContainer",
         "CreateContainerQueueProxy",
         "StartContainerUserContainer", // For CoCo: pull app image in the guest
-        "StartContainerQueueProxy", // For CoCo: pull sidecar image in the guest
+        "StartContainerQueueProxy",    // For CoCo: pull sidecar image in the guest
     ];
 
     pub fn get_color_for_event(event: &str) -> RGBColor {
@@ -142,14 +142,15 @@ impl Containerd {
 
                 // ---------- PullImage ----------
 
-                if pull_image_start.is_none()
-                    && message.contains("PullImage")
-                {
+                if pull_image_start.is_none() && message.contains("PullImage") {
                     pull_image_start = Some(timestamp);
                     continue;
                 }
 
-                if message.contains("PullImage") && message.contains("returns image reference") && !pull_image_start.is_none() {
+                if message.contains("PullImage")
+                    && message.contains("returns image reference")
+                    && pull_image_start.is_some()
+                {
                     if let (Some(start), Some(end)) = (pull_image_start, Some(timestamp)) {
                         ts_map.insert("PullImage".to_string(), (start, end));
                     }
@@ -268,8 +269,14 @@ impl Containerd {
             // Warm Knative starts do not report the PullImage event, so we
             // add it here with the same start/end timestamp so that it reports
             // a time of 0
-            debug!("{}(containerd): warm execution misses PullImage event", Env::SYS_NAME);
-            ts_map.insert("PullImage".to_string(), (run_sandbox_start.unwrap(), run_sandbox_start.unwrap()));
+            debug!(
+                "{}(containerd): warm execution misses PullImage event",
+                Env::SYS_NAME
+            );
+            ts_map.insert(
+                "PullImage".to_string(),
+                (run_sandbox_start.unwrap(), run_sandbox_start.unwrap()),
+            );
         } else if ts_map.len() != num_expected_events {
             warn!("{}(containerd): expected {num_expected_events} journalctl events for '{deployment_id}' but got {}",
                   Env::SYS_NAME,
