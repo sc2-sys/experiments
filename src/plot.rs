@@ -207,8 +207,13 @@ impl Plot {
             for event in Containerd::CONTAINERD_INFO_EVENTS {
                 chart
                     .draw_series((0..).zip(data.iter()).map(|(x, (baseline, event_vec))| {
+                        let this_color = if data_idx == 0 {
+                            Containerd::get_color_for_event(event).into()
+                        } else {
+                            Containerd::get_color_for_event(event).mix(0.6).into()
+                        };
                         let bar_style = ShapeStyle {
-                            color: Containerd::get_color_for_event(event).into(),
+                            color: this_color,
                             filled: true,
                             stroke_width: 2,
                         };
@@ -229,7 +234,14 @@ impl Plot {
                         );
                         *prev_y += this_y;
 
-                        bar.set_margin(0, 0, 2, 2);
+                        // Set the margins so that bars for the same baseline
+                        // touch
+                        if data_idx == 0 {
+                            bar.set_margin(0, 0, 2, 0);
+                        } else {
+                            bar.set_margin(0, 0, 0, 2);
+                        }
+
                         bar
                     }))
                     .unwrap();
@@ -248,16 +260,29 @@ impl Plot {
                     let margin_units = margin_px as f64 * (x_axis_range.end - x_axis_range.start)
                         / chart_width_px as f64;
 
-                    PathElement::new(
-                        vec![
-                            (x_orig + margin_units, this_y),
-                            (x_orig - margin_units + bar_width, this_y),
-                            (x_orig - margin_units + bar_width, 0.0),
-                            (x_orig + margin_units, 0.0),
-                            (x_orig + margin_units, this_y),
-                        ],
-                        BLACK,
-                    )
+                    if data_idx == 0 {
+                        PathElement::new(
+                            vec![
+                                (x_orig + margin_units, this_y),
+                                (x_orig + bar_width, this_y),
+                                (x_orig + bar_width, 0.0),
+                                (x_orig + margin_units, 0.0),
+                                (x_orig + margin_units, this_y),
+                            ],
+                            BLACK,
+                        )
+                    } else {
+                        PathElement::new(
+                            vec![
+                                (x_orig, this_y),
+                                (x_orig - margin_units + bar_width, this_y),
+                                (x_orig - margin_units + bar_width, 0.0),
+                                (x_orig, 0.0),
+                                (x_orig, this_y),
+                            ],
+                            BLACK,
+                        )
+                    }
                 }))
                 .unwrap();
         }
@@ -348,6 +373,20 @@ impl Plot {
             ))
             .unwrap();
         }
+
+        // Manually draw cold/warm labels for one bar
+        root.draw(&Text::new(
+            "cold",
+            (60, 300),
+            ("sans-serif", 14).into_font(),
+        ))
+        .unwrap();
+        root.draw(&Text::new(
+            "warm",
+            (100, 320),
+            ("sans-serif", 14).into_font(),
+        ))
+        .unwrap();
 
         println!(
             "{}(plot): generated plot at: {}",
