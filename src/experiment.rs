@@ -289,10 +289,17 @@ impl Exp {
 
     fn clean_up_after_run(exp: &AvailableExperiments, env_vars: &BTreeMap<&str, String>) {
         if exp == &AvailableExperiments::StartUp && env_vars["START_UP_FLAVOUR"] == "cold" {
-            Cri::remove_image(format!(
-                "{}/helloworld-py:unencrypted",
-                env_vars["CTR_REGISTRY_URL"]
-            ));
+            if env_vars["SC2_BASELINE"].contains("sc2") {
+                Cri::remove_image(format!(
+                    "{}/helloworld-py:unencrypted-nydus",
+                    env_vars["CTR_REGISTRY_URL"]
+                ));
+            } else {
+                Cri::remove_image(format!(
+                    "{}/helloworld-py:unencrypted",
+                    env_vars["CTR_REGISTRY_URL"]
+                ));
+            }
         }
     }
 
@@ -377,24 +384,36 @@ impl Exp {
     /// we can call run_knative_experiment to handle the deployment, execution,
     /// clean-up, and result aggregation
     pub fn run(exp: &AvailableExperiments, args: &ExpRunArgs) {
-        // Work-out the Knative service to deploy
-        let mut apps_root = Env::apps_root();
-        let yaml_path: PathBuf = match &exp {
-            AvailableExperiments::ScaleOut => {
-                apps_root.push("functions");
-                apps_root.push("helloworld-py-scaleout");
-                apps_root.push("service.yaml");
-                apps_root
-            }
-            AvailableExperiments::StartUp => {
-                apps_root.push("functions");
-                apps_root.push("helloworld-py");
-                apps_root.push("service.yaml");
-                apps_root
-            }
-        };
-
         for baseline in &args.baseline {
+            // Work-out the Knative service to deploy
+            let mut apps_root = Env::apps_root();
+
+            let yaml_path: PathBuf = match &exp {
+                AvailableExperiments::ScaleOut => {
+                    apps_root.push("functions");
+                    apps_root.push("helloworld-py-scaleout");
+                    apps_root.push("service.yaml");
+                    apps_root
+                }
+                AvailableExperiments::StartUp => match &baseline {
+                    AvailableBaselines::Runc
+                    | AvailableBaselines::Kata
+                    | AvailableBaselines::Snp
+                    | AvailableBaselines::Tdx => {
+                        apps_root.push("functions");
+                        apps_root.push("helloworld-py");
+                        apps_root.push("service.yaml");
+                        apps_root
+                    }
+                    AvailableBaselines::SnpSc2 | AvailableBaselines::TdxSc2 => {
+                        apps_root.push("functions");
+                        apps_root.push("helloworld-py-nydus");
+                        apps_root.push("service.yaml");
+                        apps_root
+                    }
+                },
+            };
+
             // Work-out the env. vars that we need to template in the service file
             let mut env_vars: BTreeMap<&str, String> = BTreeMap::from([
                 ("SC2_BASELINE", format!("{baseline}")),

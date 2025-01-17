@@ -1,82 +1,98 @@
 use crate::env::Env;
 use log::debug;
+use log::info;
 use std::{error::Error, process::Command, process::Stdio, str};
 
 #[derive(Debug)]
 pub struct Cri {}
 
 impl Cri {
-    /// Get an image's digest from its tag using docker
-    fn get_digest_from_tag(image_tag: &str) -> Result<String, Box<dyn Error>> {
-        let pull_status = Command::new("docker")
-            .args(["pull", image_tag])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
-        if !pull_status.success() {
+    /// Get an image's digest from its tag using `crictl images`
+    fn get_digest_from_tag(image_tag: &str) -> Result<Vec<String>, Box<dyn Error>> {
+        // Get the list of images in crictl
+        let image_ids_output = Command::new("sudo")
+            .arg("crictl")
+            .arg("--runtime-endpoint")
+            .arg("unix:///run/containerd/containerd.sock")
+            .arg("images")
+            .stdout(Stdio::piped())
+            .output()
+            .expect("sc2(cri): failed to execute crictl images command");
+
+        if !image_ids_output.status.success() {
             return Err(format!(
-                "{}(cri): failed to pull docker image with tag: {image_tag}",
-                Env::SYS_NAME
+                "{}(cri): failed to get crictl images: error: {}",
+                Env::SYS_NAME,
+                String::from_utf8_lossy(&image_ids_output.stderr)
             )
             .into());
         }
 
-        // Inspect the image to get its digest
-        let output = Command::new("docker")
-            .args(["inspect", "--format", "{{.Id}}", image_tag])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .output()?;
-        if !output.status.success() {
+        // We deliberately only filter by image name, and not by tag, as
+        // somtimes the tag appears as none, this means that we may sometimes
+        // remove more images than needed, but we are ok with that
+        let (image_name, _tag) = image_tag.split_once(':').unwrap();
+        let image_ids = String::from_utf8_lossy(&image_ids_output.stdout);
+        let filtered_image_ids: Vec<String> = image_ids
+            .lines()
+            .filter(|line| line.contains(image_name))
+            // .filter(|line| line.contains(tag))
+            .filter_map(|line| line.split_whitespace().nth(2))
+            .map(|s| s.to_string())
+            .collect();
+
+        if filtered_image_ids.is_empty() {
             return Err(format!(
-                "{}(cri): failed to inspect Docker image with tag: {image_tag}: error: {}",
+                "{}(cri): did not find any matching image ids for image: {image_tag}",
                 Env::SYS_NAME,
-                String::from_utf8_lossy(&output.stderr)
             )
             .into());
         }
 
         // Extract and return the digest
-        let digest = String::from_utf8(output.stdout)?.trim().to_string();
-        Ok(digest)
+        Ok(filtered_image_ids.clone())
     }
 
     /// Remove an image from the CRI's image store. Note that removing the
     /// image from tag is, sometimes, unreliable, so we remove it by specifying
-    /// its digest.
+    /// its digest. Furthermore, tags do not always appear in crictl images,
+    /// so we remove all tags of the same image.
     pub fn remove_image(image_tag: String) {
-        let image_digest = Self::get_digest_from_tag(&image_tag).unwrap();
-        debug!(
-            "{}(cri): removing image {image_tag} (sha: {image_digest})",
-            Env::SYS_NAME
-        );
+        let image_digests = Self::get_digest_from_tag(&image_tag).unwrap();
+        for image_digest in &image_digests {
+            info!("remove me, got digest: {image_digest}");
+            debug!(
+                "{}(cri): removing image {image_tag} (sha: {image_digest})",
+                Env::SYS_NAME
+            );
 
-        let output = Command::new("sudo")
-            .args([
-                "crictl",
-                "--runtime-endpoint",
-                "unix:///run/containerd/containerd.sock",
-                "rmi",
-                &image_digest,
-            ])
-            .output()
-            .expect("sc2-exp(cri): error removing image");
+            let output = Command::new("sudo")
+                .args([
+                    "crictl",
+                    "--runtime-endpoint",
+                    "unix:///run/containerd/containerd.sock",
+                    "rmi",
+                    image_digest,
+                ])
+                .output()
+                .expect("sc2-exp(cri): error removing image");
 
-        match output.status.code() {
-            Some(0) => {}
-            Some(code) => {
-                let stderr =
-                    str::from_utf8(&output.stderr).unwrap_or("sc2-exp(cri): failed to get stderr");
-                panic!(
-                    "{}(cri): cri-rmi exited with error (code: {code}): {stderr}",
-                    Env::SYS_NAME
-                );
-            }
-            None => {
-                let stderr =
-                    str::from_utf8(&output.stderr).unwrap_or("sc2-exp(cri): failed to get stderr");
-                panic!("{}(cri): cri-rmi command failed: {stderr}", Env::SYS_NAME);
-            }
-        };
+            match output.status.code() {
+                Some(0) => {}
+                Some(code) => {
+                    let stderr = str::from_utf8(&output.stderr)
+                        .unwrap_or("sc2-exp(cri): failed to get stderr");
+                    panic!(
+                        "{}(cri): cri-rmi exited with error (code: {code}): {stderr}",
+                        Env::SYS_NAME
+                    );
+                }
+                None => {
+                    let stderr = str::from_utf8(&output.stderr)
+                        .unwrap_or("sc2-exp(cri): failed to get stderr");
+                    panic!("{}(cri): cri-rmi command failed: {stderr}", Env::SYS_NAME);
+                }
+            };
+        }
     }
 }
