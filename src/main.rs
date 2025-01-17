@@ -29,6 +29,11 @@ enum ExpSubCommand {
 
 #[derive(Debug, Subcommand)]
 enum ExpCommand {
+    /// Experiment comparing different image pulling techniques
+    ImagePull {
+        #[command(subcommand)]
+        exp_sub_command: ExpSubCommand,
+    },
     /// Evaluate the start-up latency
     StartUp {
         #[command(subcommand)]
@@ -56,6 +61,16 @@ fn main() {
     }
 
     match &cli.task {
+        ExpCommand::ImagePull {
+            exp_sub_command: eval_sub_command,
+        } => match eval_sub_command {
+            ExpSubCommand::Run(run_args) => {
+                Exp::run(&AvailableExperiments::ImagePull, run_args);
+            }
+            ExpSubCommand::Plot {} => {
+                Plot::plot(&AvailableExperiments::ImagePull);
+            }
+        },
         ExpCommand::ScaleOut {
             exp_sub_command: eval_sub_command,
         } => match eval_sub_command {

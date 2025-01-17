@@ -73,6 +73,54 @@ impl AvailableBaselines {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub enum ImagePullBaselines {
+    GuestPull,
+    GuestLazy,
+    HostMount,
+    Sc2,
+}
+
+impl fmt::Display for ImagePullBaselines {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImagePullBaselines::GuestPull => write!(f, "guest-pull"),
+            ImagePullBaselines::GuestLazy => write!(f, "guest-lazy"),
+            ImagePullBaselines::HostMount => write!(f, "host-mount"),
+            ImagePullBaselines::Sc2 => write!(f, "sc2"),
+        }
+    }
+}
+
+impl FromStr for ImagePullBaselines {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<ImagePullBaselines, Self::Err> {
+        match input {
+            "guest-pull" => Ok(ImagePullBaselines::GuestPull),
+            "guest-lazy" => Ok(ImagePullBaselines::GuestLazy),
+            "host-mount" => Ok(ImagePullBaselines::HostMount),
+            "sc2" => Ok(ImagePullBaselines::Sc2),
+            _ => Err(()),
+        }
+    }
+}
+
+impl ImagePullBaselines {
+    pub fn iter_variants() -> std::slice::Iter<'static, ImagePullBaselines> {
+        static VARIANTS: [ImagePullBaselines; 4] = [
+            ImagePullBaselines::GuestPull,
+            ImagePullBaselines::GuestLazy,
+            ImagePullBaselines::HostMount,
+            ImagePullBaselines::Sc2,
+        ];
+        VARIANTS.iter()
+    }
+}
+
+pub const IMAGE_PULL_WORKLOADS: [&str; 1] = ["hw"]; // ["hw", "tflite"]
+pub const IMAGE_PULL_ENCRYPTION_TYPES: [&str; 1] = ["unencrypted"]; // ["unencrypted", "encrypted"];
+
 #[derive(Debug, Args)]
 pub struct ExpRunArgs {
     #[arg(long, num_args = 1.., value_name = "BASELINE")]
@@ -81,12 +129,14 @@ pub struct ExpRunArgs {
     num_repeats: u32,
     #[arg(long, default_value = "1")]
     num_warmup_repeats: u32,
+    // TODO(scale-out): probably remove this parameter
     #[arg(long, default_value = "4")]
     scale_up_range: u32,
 }
 
 #[derive(PartialEq)]
 pub enum AvailableExperiments {
+    ImagePull,
     ScaleOut,
     StartUp,
 }
@@ -94,6 +144,7 @@ pub enum AvailableExperiments {
 impl fmt::Display for AvailableExperiments {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            AvailableExperiments::ImagePull => write!(f, "image-pull"),
             AvailableExperiments::ScaleOut => write!(f, "scale-out"),
             AvailableExperiments::StartUp => write!(f, "start-up"),
         }
@@ -146,7 +197,7 @@ impl Exp {
                 writeln!(file, "Run,TimeMs")
                     .expect("sc2-eval(k8s): failed to write to data file at: {results_file:?}");
             }
-            AvailableExperiments::StartUp => {
+            AvailableExperiments::ImagePull | AvailableExperiments::StartUp => {
                 writeln!(file, "Run,Event,TimeMs")
                     .expect("sc2-eval(k8s): failed to write to data file at: {results_file:?}");
             }
@@ -165,6 +216,47 @@ impl Exp {
             .expect("sc2-eval(k8s): failed to open data file at: {results_file:?}");
 
         match exp {
+            AvailableExperiments::ImagePull => {
+                // Manually write-down the end-to-end event
+                let total_duration: Duration = exec_results.end_time - exec_results.start_time;
+                writeln!(
+                    file,
+                    "{},EndToEnd,{}",
+                    exec_results.iter,
+                    total_duration.num_milliseconds()
+                )
+                .expect("sc2-eval(k8s): failed to write to data file at: {results_file:?}");
+
+                // Write all the events that we decide to record for the
+                // break-down of the image-pull time. Keep track of the
+                // largest time-stamp here, we will use it, together with the
+                // e2e one, to measure the actual runtime
+                let mut max_end_ts: DateTime<Utc> = exec_results.start_time;
+                for (event, (start_ts, end_ts)) in &exec_results.event_ts {
+                    let duration: Duration = *end_ts - *start_ts;
+                    writeln!(
+                        file,
+                        "{},{},{}",
+                        exec_results.iter,
+                        event,
+                        duration.num_milliseconds()
+                    )
+                    .expect("sc2-eval(k8s): failed to write to data file at: {results_file:?}");
+
+                    if *end_ts > max_end_ts {
+                        max_end_ts = *end_ts;
+                    }
+                }
+
+                let runtime_duration: Duration = exec_results.end_time - max_end_ts;
+                writeln!(
+                    file,
+                    "{},FuncRuntime,{}",
+                    exec_results.iter,
+                    runtime_duration.num_milliseconds()
+                )
+                .expect("sc2-eval(k8s): failed to write to data file at: {results_file:?}");
+            }
             AvailableExperiments::ScaleOut => {
                 let duration: Duration = exec_results.end_time - exec_results.start_time;
                 writeln!(
@@ -300,6 +392,12 @@ impl Exp {
                     env_vars["CTR_REGISTRY_URL"]
                 ));
             }
+        } else if exp == &AvailableExperiments::ImagePull && env_vars["START_UP_FLAVOUR"] == "cold"
+        {
+            Cri::remove_image(format!(
+                "{}/{}:{}",
+                env_vars["CTR_REGISTRY_URL"], env_vars["IMAGE_NAME"], env_vars["IMAGE_TAG"],
+            ));
         }
     }
 
@@ -324,6 +422,15 @@ impl Exp {
         results_file.push("data");
         fs::create_dir_all(results_file.clone()).unwrap();
         results_file.push(match &exp {
+            AvailableExperiments::ImagePull => {
+                format!(
+                    "{}_{}_{}_{}.csv",
+                    env_vars["WORKLOAD"],
+                    env_vars["ENCRYPTION"],
+                    env_vars["IMAGE_PULL_TYPE"],
+                    env_vars["START_UP_FLAVOUR"]
+                )
+            }
             AvailableExperiments::ScaleOut => {
                 format!("{}_{}.csv", env_vars["SC2_BASELINE"], env_vars["SCALE_IDX"])
             }
@@ -346,6 +453,16 @@ impl Exp {
         let pb = Self::get_progress_bar(
             args.num_repeats.into(),
             match &exp {
+                AvailableExperiments::ImagePull => {
+                    format!(
+                        "{}/{}-{}/{}/{}",
+                        exp,
+                        env_vars["WORKLOAD"],
+                        env_vars["ENCRYPTION"],
+                        env_vars["IMAGE_PULL_TYPE"],
+                        env_vars["START_UP_FLAVOUR"],
+                    )
+                }
                 AvailableExperiments::ScaleOut => {
                     format!(
                         "{}/{}/{}",
@@ -384,11 +501,23 @@ impl Exp {
     /// we can call run_knative_experiment to handle the deployment, execution,
     /// clean-up, and result aggregation
     pub fn run(exp: &AvailableExperiments, args: &ExpRunArgs) {
-        for baseline in &args.baseline {
+        // Some experiments only use a fixed baseline
+        let baselines = match exp {
+            AvailableExperiments::ImagePull => vec![AvailableBaselines::SnpSc2],
+            _ => args.baseline.clone(),
+        };
+
+        for baseline in &baselines {
             // Work-out the Knative service to deploy
             let mut apps_root = Env::apps_root();
 
-            let yaml_path: PathBuf = match &exp {
+            let mut yaml_path: PathBuf = match &exp {
+                // For ImagePull experiment, we will use different YAML
+                // paths depending on the experiment we are running
+                AvailableExperiments::ImagePull => {
+                    apps_root.push("functions");
+                    apps_root
+                }
                 AvailableExperiments::ScaleOut => {
                     apps_root.push("functions");
                     apps_root.push("helloworld-py-scaleout");
@@ -434,6 +563,57 @@ impl Exp {
 
             // Per-experiment env. var templating and execution
             match &exp {
+                AvailableExperiments::ImagePull => {
+                    // TODO: decide if/how we will strongly type these things (maybe good for
+                    // plotting?)
+                    let start_up_flavours = ["cold", "warm"];
+
+                    // let mut image_name: String;
+                    let mut image_tag: String;
+                    for workload in &IMAGE_PULL_WORKLOADS {
+                        match *workload {
+                            "hw" => {
+                                env_vars.insert("WORKLOAD", workload.to_string());
+                                env_vars.insert("KSERVICE_NAME", "helloworld-py".to_string());
+                                env_vars.insert("IMAGE_NAME", "helloworld-py".to_string());
+
+                                // Also update the YAML path
+                                yaml_path.push("helloworld-py");
+                                yaml_path.push("service.yaml");
+                            }
+                            _ => unreachable!(),
+                        }
+
+                        for encryption_type in &IMAGE_PULL_ENCRYPTION_TYPES {
+                            env_vars.insert("ENCRYPTION", encryption_type.to_string());
+                            image_tag = encryption_type.to_string();
+
+                            for image_pull_type in ImagePullBaselines::iter_variants() {
+                                // TODO: remove me when all image-pull baselines are implemented
+                                let supported_image_pull_types =
+                                    [ImagePullBaselines::GuestPull, ImagePullBaselines::GuestLazy];
+                                if !supported_image_pull_types.contains(image_pull_type) {
+                                    continue;
+                                }
+
+                                // Work-out the image tag based on the pull type
+                                if image_pull_type == &ImagePullBaselines::GuestLazy {
+                                    image_tag += "-nydus";
+                                }
+
+                                env_vars.insert("IMAGE_PULL_TYPE", image_pull_type.to_string());
+                                env_vars.insert("IMAGE_TAG", image_tag.clone());
+
+                                for start_up_flavour in &start_up_flavours {
+                                    env_vars
+                                        .insert("START_UP_FLAVOUR", start_up_flavour.to_string());
+
+                                    Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
+                                }
+                            }
+                        }
+                    }
+                }
                 AvailableExperiments::ScaleOut => {
                     env_vars.insert("KSERVICE_NAME", "helloworld-py".to_string());
                     for i in 1..args.scale_up_range {
