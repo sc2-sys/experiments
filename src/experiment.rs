@@ -576,10 +576,6 @@ impl Exp {
                                 env_vars.insert("WORKLOAD", workload.to_string());
                                 env_vars.insert("KSERVICE_NAME", "helloworld-py".to_string());
                                 env_vars.insert("IMAGE_NAME", "helloworld-py".to_string());
-
-                                // Also update the YAML path
-                                yaml_path.push("helloworld-py");
-                                yaml_path.push("service.yaml");
                             }
                             _ => unreachable!(),
                         }
@@ -591,14 +587,26 @@ impl Exp {
                             for image_pull_type in ImagePullBaselines::iter_variants() {
                                 // TODO: remove me when all image-pull baselines are implemented
                                 let supported_image_pull_types =
-                                    [ImagePullBaselines::GuestPull, ImagePullBaselines::GuestLazy];
+                                    [ImagePullBaselines::GuestLazy];
+                                    // [ImagePullBaselines::GuestPull, ImagePullBaselines::GuestLazy];
                                 if !supported_image_pull_types.contains(image_pull_type) {
                                     continue;
                                 }
 
                                 // Work-out the image tag based on the pull type
+                                // and update the yaml path
                                 if image_pull_type == &ImagePullBaselines::GuestLazy {
                                     image_tag += "-nydus";
+
+                                    if *workload == "hw" {
+                                        yaml_path.push("helloworld-py-nydus");
+                                        yaml_path.push("service.yaml");
+                                    }
+                                } else {
+                                    if *workload == "hw" {
+                                        yaml_path.push("helloworld-py");
+                                        yaml_path.push("service.yaml");
+                                    }
                                 }
 
                                 env_vars.insert("IMAGE_PULL_TYPE", image_pull_type.to_string());
