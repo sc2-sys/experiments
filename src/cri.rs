@@ -1,6 +1,5 @@
 use crate::env::Env;
 use log::debug;
-use log::info;
 use std::{error::Error, process::Command, process::Stdio, str};
 
 #[derive(Debug)]
@@ -60,7 +59,6 @@ impl Cri {
     pub fn remove_image(image_tag: String) {
         let image_digests = Self::get_digest_from_tag(&image_tag).unwrap();
         for image_digest in &image_digests {
-            info!("remove me, got digest: {image_digest}");
             debug!(
                 "{}(cri): removing image {image_tag} (sha: {image_digest})",
                 Env::SYS_NAME
