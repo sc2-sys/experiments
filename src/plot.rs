@@ -809,8 +809,6 @@ impl Plot {
                         );
                     }
                 }
-
-                // TODO: zip all files to download it once, or coalesce them
             }
             AvailableExperiments::ScaleOut => {
                 panic!("not implemented :-(");

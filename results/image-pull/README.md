@@ -1,16 +1,9 @@
-## Start-Up Experimnet
+## Image-Pull Experimnet
 
-This experiment measures the start-up latency of a simple Knative service. It
-compares SC2 with runc, and Kata-Qemu plain and with SEV-SNP and TDX.
-
-Once you have a working SC2 cluster, you may run the experiment using:
+This experiment explores the different image-pulling mechanisms available for
+confidential containers in cVMs.
 
 ```bash
-sc2-exp start-up run --baseline [runc,kata,snp,snp-sc2,tdx,tdx-sc2]
-```
-
-after running all baselines, you may plot the results using:
-
-```bash
-sc2-exp start-up plot
+sc2-exp image-pull run [--debug]
+sc2-exp image-pull plot [--debug]
 ```

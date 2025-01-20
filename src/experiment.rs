@@ -118,7 +118,7 @@ impl ImagePullBaselines {
     }
 }
 
-pub const IMAGE_PULL_WORKLOADS: [&str; 1] = ["hw"]; // ["hw", "tflite"]
+pub const IMAGE_PULL_WORKLOADS: [&str; 3] = ["hello-world", "fio", "tf-inference"];
 pub const IMAGE_PULL_ENCRYPTION_TYPES: [&str; 1] = ["unencrypted"]; // ["unencrypted", "encrypted"];
 
 #[derive(Debug, Args)]
@@ -320,14 +320,41 @@ impl Exp {
         let mut exec_result = ExecutionResult::new();
 
         // Do single execution
-        debug!(
-            "{}: running curl command to ip: {service_ip}",
-            Env::SYS_NAME
-        );
-        let output = Command::new("curl")
-            .arg(service_ip)
-            .output()
-            .expect("sc2-eval(k8s): failed to spawn curl command");
+        let output = if service_name == "tf-inference" {
+            let mut image_data_path = Env::apps_root();
+            image_data_path.push("functions");
+            image_data_path.push("tf-inference");
+            image_data_path.push("preprocess-image");
+            image_data_path.push("image_data.json");
+
+            debug!(
+                "{}: running curl command to ip: {service_ip} with image data: {}",
+                Env::SYS_NAME,
+                format!("@{}", image_data_path.to_string_lossy().into_owned()),
+            );
+
+            Command::new("curl")
+                .arg("-H")
+                .arg("Content-Type: application/json")
+                .arg("-d")
+                .arg(format!(
+                    "@{}",
+                    image_data_path.to_string_lossy().into_owned()
+                ))
+                .arg(format!("{service_ip}/v1/models/mobilenet:predict"))
+                .output()
+                .expect("sc2-eval(k8s): failed to spawn curl command")
+        } else {
+            debug!(
+                "{}: running curl command to ip: {service_ip}",
+                Env::SYS_NAME
+            );
+
+            Command::new("curl")
+                .arg(service_ip)
+                .output()
+                .expect("sc2-eval(k8s): failed to spawn curl command")
+        };
 
         match output.status.code() {
             Some(0) => {
@@ -379,21 +406,8 @@ impl Exp {
         exec_result
     }
 
-    fn clean_up_after_run(exp: &AvailableExperiments, env_vars: &BTreeMap<&str, String>) {
-        if exp == &AvailableExperiments::StartUp && env_vars["START_UP_FLAVOUR"] == "cold" {
-            if env_vars["SC2_BASELINE"].contains("sc2") {
-                Cri::remove_image(format!(
-                    "{}/helloworld-py:unencrypted-nydus",
-                    env_vars["CTR_REGISTRY_URL"]
-                ));
-            } else {
-                Cri::remove_image(format!(
-                    "{}/helloworld-py:unencrypted",
-                    env_vars["CTR_REGISTRY_URL"]
-                ));
-            }
-        } else if exp == &AvailableExperiments::ImagePull && env_vars["START_UP_FLAVOUR"] == "cold"
-        {
+    fn clean_up_after_run(_exp: &AvailableExperiments, env_vars: &BTreeMap<&str, String>) {
+        if env_vars["START_UP_FLAVOUR"] == "cold" {
             Cri::remove_image(format!(
                 "{}/{}:{}",
                 env_vars["CTR_REGISTRY_URL"], env_vars["IMAGE_NAME"], env_vars["IMAGE_TAG"],
@@ -524,23 +538,12 @@ impl Exp {
                     apps_root.push("service.yaml");
                     apps_root
                 }
-                AvailableExperiments::StartUp => match &baseline {
-                    AvailableBaselines::Runc
-                    | AvailableBaselines::Kata
-                    | AvailableBaselines::Snp
-                    | AvailableBaselines::Tdx => {
-                        apps_root.push("functions");
-                        apps_root.push("helloworld-py");
-                        apps_root.push("service.yaml");
-                        apps_root
-                    }
-                    AvailableBaselines::SnpSc2 | AvailableBaselines::TdxSc2 => {
-                        apps_root.push("functions");
-                        apps_root.push("helloworld-py-nydus");
-                        apps_root.push("service.yaml");
-                        apps_root
-                    }
-                },
+                AvailableExperiments::StartUp => {
+                    apps_root.push("functions");
+                    apps_root.push("hello-world");
+                    apps_root.push("service.yaml");
+                    apps_root
+                }
             };
 
             // Work-out the env. vars that we need to template in the service file
@@ -571,14 +574,13 @@ impl Exp {
                     // let mut image_name: String;
                     let mut image_tag: String;
                     for workload in &IMAGE_PULL_WORKLOADS {
-                        match *workload {
-                            "hw" => {
-                                env_vars.insert("WORKLOAD", workload.to_string());
-                                env_vars.insert("KSERVICE_NAME", "helloworld-py".to_string());
-                                env_vars.insert("IMAGE_NAME", "helloworld-py".to_string());
-                            }
-                            _ => unreachable!(),
-                        }
+                        env_vars.insert("WORKLOAD", workload.to_string());
+                        env_vars.insert("KSERVICE_NAME", workload.to_string());
+                        env_vars.insert("IMAGE_NAME", workload.to_string());
+
+                        // Update YAML path
+                        yaml_path.push(workload);
+                        yaml_path.push("service.yaml");
 
                         for encryption_type in &IMAGE_PULL_ENCRYPTION_TYPES {
                             env_vars.insert("ENCRYPTION", encryption_type.to_string());
@@ -587,8 +589,7 @@ impl Exp {
                             for image_pull_type in ImagePullBaselines::iter_variants() {
                                 // TODO: remove me when all image-pull baselines are implemented
                                 let supported_image_pull_types =
-                                    [ImagePullBaselines::GuestLazy];
-                                    // [ImagePullBaselines::GuestPull, ImagePullBaselines::GuestLazy];
+                                    [ImagePullBaselines::GuestPull, ImagePullBaselines::GuestLazy];
                                 if !supported_image_pull_types.contains(image_pull_type) {
                                     continue;
                                 }
@@ -597,16 +598,6 @@ impl Exp {
                                 // and update the yaml path
                                 if image_pull_type == &ImagePullBaselines::GuestLazy {
                                     image_tag += "-nydus";
-
-                                    if *workload == "hw" {
-                                        yaml_path.push("helloworld-py-nydus");
-                                        yaml_path.push("service.yaml");
-                                    }
-                                } else {
-                                    if *workload == "hw" {
-                                        yaml_path.push("helloworld-py");
-                                        yaml_path.push("service.yaml");
-                                    }
                                 }
 
                                 env_vars.insert("IMAGE_PULL_TYPE", image_pull_type.to_string());
@@ -623,14 +614,16 @@ impl Exp {
                     }
                 }
                 AvailableExperiments::ScaleOut => {
-                    env_vars.insert("KSERVICE_NAME", "helloworld-py".to_string());
+                    env_vars.insert("KSERVICE_NAME", "hello-world".to_string());
                     for i in 1..args.scale_up_range {
                         env_vars.insert("SCALE_IDX", i.to_string());
                         Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
                     }
                 }
                 AvailableExperiments::StartUp => {
-                    env_vars.insert("KSERVICE_NAME", "helloworld-py".to_string());
+                    env_vars.insert("KSERVICE_NAME", "hello-world".to_string());
+                    env_vars.insert("IMAGE_NAME", "hello-world".to_string());
+                    env_vars.insert("IMAGE_TAG", "unencrypted".to_string());
                     for flavour in ["cold", "warm"] {
                         env_vars.insert("START_UP_FLAVOUR", flavour.to_string());
                         Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
