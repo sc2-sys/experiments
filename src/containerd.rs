@@ -26,15 +26,28 @@ impl Containerd {
         "StartContainerQueueProxy",    // For CoCo: pull sidecar image in the guest
     ];
 
+    pub const IMAGE_PULL_CONTAINERD_INFO_EVENTS: [&'static str; 8] = [
+        "EndToEnd",      // Fake event that we add to measure end-to-end time
+        "RunPodSandbox", // This event captures the time to start the sandbox
+        "PullImage",     // This event captures the time to pull an image in the host
+        "CreateContainerUserContainer",
+        "CreateContainerQueueProxy",
+        "StartContainerUserContainer", // For CoCo: pull app image in the guest
+        "StartContainerQueueProxy",    // For CoCo: pull sidecar image in the guest
+        "FuncRuntime",                 // Fake event that we add to measure function execution time
+    ];
+
     pub fn get_color_for_event(event: &str) -> RGBColor {
         match event {
             "StartUp" => RGBColor(102, 102, 255),
+            "EndToEnd" => RGBColor(102, 102, 255),
             "RunPodSandbox" => RGBColor(102, 255, 178),
             "PullImage" => RGBColor(245, 161, 66),
             "CreateContainerUserContainer" => RGBColor(255, 102, 178),
             "CreateContainerQueueProxy" => RGBColor(255, 102, 178),
             "StartContainerUserContainer" => RGBColor(255, 255, 102),
             "StartContainerQueueProxy" => RGBColor(255, 255, 102),
+            "FuncRuntime" => RGBColor(50, 50, 142),
             _ => panic!("{}(containerd): unrecognised event: {event}", Env::SYS_NAME),
         }
     }
