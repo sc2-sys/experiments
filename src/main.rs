@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 pub mod containerd;
 pub mod cri;
+pub mod deploy;
 pub mod env;
 pub mod experiment;
 pub mod kubernetes;
@@ -48,6 +49,8 @@ enum ExpCommand {
 
 fn main() {
     let cli = Cli::parse();
+
+    // TODO: make sure that all application images exist in the container registry
 
     // Initialize the logger based on the debug flag
     if cli.debug {

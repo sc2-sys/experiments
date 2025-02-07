@@ -6,8 +6,12 @@ use std::{error::Error, process::Command, process::Stdio, str};
 pub struct Cri {}
 
 impl Cri {
-    /// Get an image's digest from its tag using `crictl images`
-    fn get_digest_from_tag(image_tag: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    /// Get an image's digest from its tag using `crictl images`. Note that
+    /// the method also works if we provide a prefix for the image
+    fn get_digest_from_tag(
+        image_tag: &str,
+        tolerate_missing: bool,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
         // Get the list of images in crictl
         let image_ids_output = Command::new("sudo")
             .arg("crictl")
@@ -30,22 +34,25 @@ impl Cri {
         // We deliberately only filter by image name, and not by tag, as
         // somtimes the tag appears as none, this means that we may sometimes
         // remove more images than needed, but we are ok with that
-        let (image_name, _tag) = image_tag.split_once(':').unwrap();
+        let image_name = image_tag.split(':').next().unwrap();
         let image_ids = String::from_utf8_lossy(&image_ids_output.stdout);
         let filtered_image_ids: Vec<String> = image_ids
             .lines()
             .filter(|line| line.contains(image_name))
-            // .filter(|line| line.contains(tag))
             .filter_map(|line| line.split_whitespace().nth(2))
             .map(|s| s.to_string())
             .collect();
 
-        if filtered_image_ids.is_empty() {
-            return Err(format!(
-                "{}(cri): did not find any matching image ids for image: {image_tag}",
-                Env::SYS_NAME,
-            )
-            .into());
+        if filtered_image_ids.is_empty() && !tolerate_missing {
+            if !tolerate_missing {
+                return Err(format!(
+                    "{}(cri): did not find any matching image ids for image: {image_tag}",
+                    Env::SYS_NAME,
+                )
+                .into());
+            } else {
+                return Ok(vec![]);
+            }
         }
 
         // Extract and return the digest
@@ -55,9 +62,11 @@ impl Cri {
     /// Remove an image from the CRI's image store. Note that removing the
     /// image from tag is, sometimes, unreliable, so we remove it by specifying
     /// its digest. Furthermore, tags do not always appear in crictl images,
-    /// so we remove all tags of the same image.
-    pub fn remove_image(image_tag: String) {
-        let image_digests = Self::get_digest_from_tag(&image_tag).unwrap();
+    /// so we remove all tags of the same image. This method can be called
+    /// either with the full image tag, or just a prefix. In the prefix case
+    /// we will remove all images with the prefix.
+    pub fn remove_image(image_tag: String, tolerate_missing: bool) {
+        let image_digests = Self::get_digest_from_tag(&image_tag, tolerate_missing).unwrap();
         for image_digest in &image_digests {
             debug!(
                 "{}(cri): removing image {image_tag} (sha: {image_digest})",

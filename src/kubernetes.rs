@@ -190,7 +190,9 @@ impl K8s {
             .expect("sc2-exp(k8s): failed to run kubectl command");
 
         match output.status.code() {
-            Some(0) => {}
+            Some(0) => {
+                debug!("sc2-exp(k8s): {}", str::from_utf8(&output.stdout).unwrap());
+            }
             Some(code) => {
                 let stderr =
                     str::from_utf8(&output.stderr).unwrap_or("sc2-exp(k8s): failed to get stderr");

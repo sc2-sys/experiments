@@ -1,4 +1,4 @@
-use crate::{containerd::Containerd, cri::Cri, env::Env, kubernetes::K8s};
+use crate::{containerd::Containerd, deploy::Deploy, env::Env, kubernetes::K8s};
 use chrono::{DateTime, Duration, Utc};
 use clap::{Args, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -408,10 +408,7 @@ impl Exp {
 
     fn clean_up_after_run(_exp: &AvailableExperiments, env_vars: &BTreeMap<&str, String>) {
         if env_vars["START_UP_FLAVOUR"] == "cold" {
-            Cri::remove_image(format!(
-                "{}/{}:{}",
-                env_vars["CTR_REGISTRY_URL"], env_vars["IMAGE_NAME"], env_vars["IMAGE_TAG"],
-            ));
+            Deploy::purge_snapshotters();
         }
     }
 
@@ -525,7 +522,7 @@ impl Exp {
             // Work-out the Knative service to deploy
             let mut apps_root = Env::apps_root();
 
-            let mut yaml_path: PathBuf = match &exp {
+            let yaml_path: PathBuf = match &exp {
                 // For ImagePull experiment, we will use different YAML
                 // paths depending on the experiment we are running
                 AvailableExperiments::ImagePull => {
@@ -579,8 +576,9 @@ impl Exp {
                         env_vars.insert("IMAGE_NAME", workload.to_string());
 
                         // Update YAML path
-                        yaml_path.push(workload);
-                        yaml_path.push("service.yaml");
+                        let mut this_yaml_path = yaml_path.clone();
+                        this_yaml_path.push(workload);
+                        this_yaml_path.push("service.yaml");
 
                         for encryption_type in &IMAGE_PULL_ENCRYPTION_TYPES {
                             env_vars.insert("ENCRYPTION", encryption_type.to_string());
@@ -588,11 +586,30 @@ impl Exp {
 
                             for image_pull_type in ImagePullBaselines::iter_variants() {
                                 // TODO: remove me when all image-pull baselines are implemented
-                                let supported_image_pull_types =
-                                    [ImagePullBaselines::GuestPull, ImagePullBaselines::GuestLazy];
+                                let supported_image_pull_types = [
+                                    ImagePullBaselines::GuestPull,
+                                    ImagePullBaselines::GuestLazy,
+                                    ImagePullBaselines::HostMount
+                                ];
                                 if !supported_image_pull_types.contains(image_pull_type) {
                                     continue;
                                 }
+
+                                // Set the snapshotter mode
+                                match image_pull_type {
+                                    ImagePullBaselines::GuestPull
+                                    | ImagePullBaselines::GuestLazy => {
+                                        Deploy::set_snapshotter_mode("guest-pull");
+                                    }
+                                    ImagePullBaselines::HostMount => {
+                                        Deploy::set_snapshotter_mode("host-share");
+                                    }
+                                    _ => todo!(),
+                                }
+
+                                // Purge to ensure a fresh start with the
+                                // new snapshotter
+                                Deploy::purge_snapshotters();
 
                                 // Work-out the image tag based on the pull type
                                 // and update the yaml path
@@ -607,7 +624,12 @@ impl Exp {
                                     env_vars
                                         .insert("START_UP_FLAVOUR", start_up_flavour.to_string());
 
-                                    Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
+                                    Self::run_knative_experiment(
+                                        exp,
+                                        args,
+                                        &this_yaml_path,
+                                        &env_vars,
+                                    );
                                 }
                             }
                         }

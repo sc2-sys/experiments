@@ -4,6 +4,7 @@ pub struct Env {}
 
 impl Env {
     pub const CONTAINER_REGISTRY_URL: &'static str = "sc2cr.io/applications";
+    pub const KNATIVE_SIDECAR_IMAGE_NAME: &'static str = "sc2cr.io/system/knative-sidecar";
     pub const K8S_NAMESPACE: &'static str = "sc2";
     pub const SYS_NAME: &'static str = "sc2-exp";
 
