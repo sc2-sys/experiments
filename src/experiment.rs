@@ -589,7 +589,7 @@ impl Exp {
                                 let supported_image_pull_types = [
                                     ImagePullBaselines::GuestPull,
                                     ImagePullBaselines::GuestLazy,
-                                    ImagePullBaselines::HostMount
+                                    ImagePullBaselines::HostMount,
                                 ];
                                 if !supported_image_pull_types.contains(image_pull_type) {
                                     continue;
