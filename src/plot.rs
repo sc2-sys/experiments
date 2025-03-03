@@ -2,8 +2,7 @@ use crate::{
     containerd::Containerd,
     env::Env,
     experiment::{
-        AvailableBaselines, AvailableExperiments, ImagePullBaselines, IMAGE_PULL_ENCRYPTION_TYPES,
-        IMAGE_PULL_WORKLOADS,
+        AvailableBaselines, AvailableExperiments, ImagePullBaselines, ImagePullWorkloads, ImagePullEncryptionTypes, StartUpFlavours,
     },
 };
 use csv::ReaderBuilder;
@@ -87,16 +86,16 @@ impl Plot {
                 .try_into()
                 .expect("sc2-exp(plot): unexpected number of parts");
             let image_pull_type: ImagePullBaselines = pull_type.parse().unwrap();
+            let startup_flavour: StartUpFlavours = flavour.parse().unwrap();
 
             if workload != this_workload || encryption_type != this_encryption_type {
                 continue;
             }
 
             // Based on the flavour, we pick one of the data dictionaries
-            let data = match flavour {
-                "cold" => &mut cold_data,
-                "warm" => &mut warm_data,
-                _ => unreachable!(),
+            let data = match startup_flavour {
+                StartUpFlavours::Cold => &mut cold_data,
+                StartUpFlavours::Warm => &mut warm_data,
             };
 
             debug!("Reading data for baseline: {workload}-{encryption_type}/{pull_type}/{flavour} (file: {csv_file:?}");
@@ -149,14 +148,6 @@ impl Plot {
         // FIXME: For the pull types that are stil not implemented, we manually
         // insert the orchestration time
         cold_data
-            .get_mut(&ImagePullBaselines::HostMount)
-            .unwrap()
-            .insert("Orchestration", 0.0);
-        warm_data
-            .get_mut(&ImagePullBaselines::HostMount)
-            .unwrap()
-            .insert("Orchestration", 0.0);
-        cold_data
             .get_mut(&ImagePullBaselines::Sc2)
             .unwrap()
             .insert("Orchestration", 0.0);
@@ -167,11 +158,10 @@ impl Plot {
 
         // ---------- Plot Data ---------- //
 
-        for flavour in ["cold", "warm"] {
+        for flavour in StartUpFlavours::iter_variants() {
             let data = match flavour {
-                "cold" => cold_data.clone(),
-                "warm" => warm_data.clone(),
-                _ => panic!("unreachable"),
+                StartUpFlavours::Cold => cold_data.clone(),
+                StartUpFlavours::Warm => warm_data.clone(),
             };
 
             for (image_pull, times) in data.iter() {
@@ -407,10 +397,14 @@ impl Plot {
         }
 
         // Manually draw cold/warm labels for one bar
-        root.draw(&Text::new("cold", (75, 90), ("sans-serif", 14).into_font()))
-            .unwrap();
         root.draw(&Text::new(
-            "warm",
+            format!("{}", StartUpFlavours::Warm),
+            (75, 90),
+            ("sans-serif", 14).into_font(),
+        ))
+        .unwrap();
+        root.draw(&Text::new(
+            format!("{}", StartUpFlavours::Warm),
             (130, 90),
             ("sans-serif", 14).into_font(),
         ))
@@ -468,15 +462,14 @@ impl Plot {
             let baseline: AvailableBaselines = file_name_no_ext.split('_').collect::<Vec<_>>()[0]
                 .parse()
                 .unwrap();
-            let flavour: String = file_name_no_ext.split('_').collect::<Vec<_>>()[1]
+            let flavour: StartUpFlavours = file_name_no_ext.split('_').collect::<Vec<_>>()[1]
                 .parse()
                 .unwrap();
 
             // Based on the flavour, we pick one of the data dictionaries
-            let data = match flavour.as_str() {
-                "cold" => &mut cold_data,
-                "warm" => &mut warm_data,
-                _ => panic!("unreachable"),
+            let data = match flavour {
+                StartUpFlavours::Cold => &mut cold_data,
+                StartUpFlavours::Warm => &mut warm_data,
             };
 
             debug!("Reading data for baseline: {baseline}/{flavour} (file: {csv_file:?}");
@@ -528,11 +521,10 @@ impl Plot {
 
         // ---------- Plot Data ---------- //
 
-        for flavour in ["cold", "warm"] {
+        for flavour in StartUpFlavours::iter_variants() {
             let data = match flavour {
-                "cold" => cold_data.clone(),
-                "warm" => warm_data.clone(),
-                _ => panic!("unreachable"),
+                StartUpFlavours::Cold => cold_data.clone(),
+                StartUpFlavours::Warm => warm_data.clone(),
             };
 
             for (baseline, times) in data.iter() {
@@ -773,13 +765,13 @@ impl Plot {
 
         // Manually draw cold/warm labels for one bar
         root.draw(&Text::new(
-            "cold",
+            format!("{}", StartUpFlavours::Cold),
             (60, 300),
             ("sans-serif", 14).into_font(),
         ))
         .unwrap();
         root.draw(&Text::new(
-            "warm",
+            format!("{}", StartUpFlavours::Warm),
             (100, 320),
             ("sans-serif", 14).into_font(),
         ))

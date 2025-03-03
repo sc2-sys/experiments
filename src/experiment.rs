@@ -73,7 +73,7 @@ impl AvailableBaselines {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
 pub enum ImagePullBaselines {
     GuestPull,
     GuestLazy,
@@ -118,8 +118,117 @@ impl ImagePullBaselines {
     }
 }
 
-pub const IMAGE_PULL_WORKLOADS: [&str; 3] = ["hello-world", "fio", "tf-inference"];
-pub const IMAGE_PULL_ENCRYPTION_TYPES: [&str; 1] = ["unencrypted"]; // ["unencrypted", "encrypted"];
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
+pub enum StartUpFlavours {
+    Cold,
+    Warm,
+}
+
+impl fmt::Display for StartUpFlavours {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StartUpFlavours::Cold => write!(f, "cold"),
+            StartUpFlavours::Warm => write!(f, "warm"),
+        }
+    }
+}
+
+impl FromStr for StartUpFlavours {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<StartUpFlavours, Self::Err> {
+        match input {
+            "cold" => Ok(StartUpFlavours::Cold),
+            "warm" => Ok(StartUpFlavours::Warm),
+            _ => Err(()),
+        }
+    }
+}
+
+impl StartUpFlavours {
+    pub fn iter_variants() -> std::slice::Iter<'static, StartUpFlavours> {
+        static VARIANTS: [StartUpFlavours; 2] = [StartUpFlavours::Cold, StartUpFlavours::Warm];
+        VARIANTS.iter()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
+pub enum ImagePullWorkloads {
+    Fio,
+    HelloWorld,
+    TfInference,
+}
+
+impl fmt::Display for ImagePullWorkloads {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImagePullWorkloads::Fio => write!(f, "fio"),
+            ImagePullWorkloads::HelloWorld => write!(f, "hello-world"),
+            ImagePullWorkloads::TfInference => write!(f, "tf-inference"),
+        }
+    }
+}
+
+impl FromStr for ImagePullWorkloads {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<ImagePullWorkloads, Self::Err> {
+        match input {
+            "fio" => Ok(ImagePullWorkloads::Fio),
+            "hello-world" => Ok(ImagePullWorkloads::HelloWorld),
+            "tf-inference" => Ok(ImagePullWorkloads::TfInference),
+            _ => Err(()),
+        }
+    }
+}
+
+impl ImagePullWorkloads {
+    pub fn iter_variants() -> std::slice::Iter<'static, ImagePullWorkloads> {
+        static VARIANTS: [ImagePullWorkloads; 3] = [
+            ImagePullWorkloads::Fio,
+            ImagePullWorkloads::HelloWorld,
+            ImagePullWorkloads::TfInference,
+        ];
+        VARIANTS.iter()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
+pub enum ImagePullEncryptionTypes {
+    Encrypted,
+    UnEncrypted,
+}
+
+impl fmt::Display for ImagePullEncryptionTypes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImagePullEncryptionTypes::Encrypted => write!(f, "encrypted"),
+            ImagePullEncryptionTypes::UnEncrypted => write!(f, "unencrypted"),
+        }
+    }
+}
+
+impl FromStr for ImagePullEncryptionTypes {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<ImagePullEncryptionTypes, Self::Err> {
+        match input {
+            "encrypted" => Ok(ImagePullEncryptionTypes::Encrypted),
+            "unencrypted" => Ok(ImagePullEncryptionTypes::UnEncrypted),
+            _ => Err(()),
+        }
+    }
+}
+
+impl ImagePullEncryptionTypes {
+    pub fn iter_variants() -> std::slice::Iter<'static, ImagePullEncryptionTypes> {
+        static VARIANTS: [ImagePullEncryptionTypes; 2] = [
+            ImagePullEncryptionTypes::Encrypted,
+            ImagePullEncryptionTypes::UnEncrypted,
+        ];
+        VARIANTS.iter()
+    }
+}
 
 #[derive(Debug, Args)]
 pub struct ExpRunArgs {
@@ -129,9 +238,22 @@ pub struct ExpRunArgs {
     num_repeats: u32,
     #[arg(long, default_value = "1")]
     num_warmup_repeats: u32,
+
     // TODO(scale-out): probably remove this parameter
     #[arg(long, default_value = "4")]
     scale_up_range: u32,
+
+    // Optional arguments for all experiments
+    #[arg(long, value_name = "STARTUP_FLAVOUR")]
+    flavour: Option<StartUpFlavours>,
+
+    // Optional arguments for `image-pull` experiment
+    #[arg(long)]
+    image_pull_type: Option<ImagePullBaselines>,
+    #[arg(long)]
+    image_pull_workload: Option<ImagePullWorkloads>,
+    #[arg(long)]
+    image_pull_encryption: Option<ImagePullEncryptionTypes>,
 }
 
 #[derive(PartialEq)]
@@ -407,7 +529,8 @@ impl Exp {
     }
 
     fn clean_up_after_run(_exp: &AvailableExperiments, env_vars: &BTreeMap<&str, String>) {
-        if env_vars["START_UP_FLAVOUR"] == "cold" {
+        let flavour: StartUpFlavours = env_vars["START_UP_FLAVOUR"].parse().unwrap();
+        if flavour == StartUpFlavours::Cold {
             Deploy::purge_snapshotters();
         }
     }
@@ -518,6 +641,13 @@ impl Exp {
             _ => args.baseline.clone(),
         };
 
+        // Work-out the start-up flavour
+        let start_up_flavours = args
+            .flavour
+            .clone()
+            .map(|val| vec![val])
+            .unwrap_or_else(|| vec![StartUpFlavours::Cold, StartUpFlavours::Warm]);
+
         for baseline in &baselines {
             // Work-out the Knative service to deploy
             let mut apps_root = Env::apps_root();
@@ -564,37 +694,60 @@ impl Exp {
             // Per-experiment env. var templating and execution
             match &exp {
                 AvailableExperiments::ImagePull => {
-                    // TODO: decide if/how we will strongly type these things (maybe good for
-                    // plotting?)
-                    let start_up_flavours = ["cold", "warm"];
+                    // Work-out the image pull type
+                    let image_pull_types = args
+                        .image_pull_type
+                        .clone()
+                        .map(|val| vec![val])
+                        .unwrap_or_else(|| {
+                            vec![
+                                ImagePullBaselines::GuestPull,
+                                ImagePullBaselines::GuestLazy,
+                                ImagePullBaselines::HostMount,
+                            ]
+                        });
 
-                    // let mut image_name: String;
+                    // Work-out the image pull workload
+                    let image_pull_workloads = args
+                        .image_pull_workload
+                        .clone()
+                        .map(|val| vec![val])
+                        .unwrap_or_else(|| {
+                            vec![
+                                ImagePullWorkloads::HelloWorld,
+                                ImagePullWorkloads::Fio,
+                                ImagePullWorkloads::TfInference,
+                            ]
+                        });
+
+                    // Work-out the image pull encryption
+                    let image_pull_encryption_types = args
+                        .image_pull_encryption
+                        .clone()
+                        .map(|val| vec![val])
+                        .unwrap_or_else(|| {
+                            vec![
+                                // ImagePullEncryptionTypes::Encrypted,
+                                ImagePullEncryptionTypes::UnEncrypted,
+                            ]
+                        });
+
                     let mut image_tag: String;
-                    for workload in &IMAGE_PULL_WORKLOADS {
+                    for workload in &image_pull_workloads {
                         env_vars.insert("WORKLOAD", workload.to_string());
                         env_vars.insert("KSERVICE_NAME", workload.to_string());
                         env_vars.insert("IMAGE_NAME", workload.to_string());
 
                         // Update YAML path
                         let mut this_yaml_path = yaml_path.clone();
-                        this_yaml_path.push(workload);
+                        this_yaml_path.push(workload.to_string());
                         this_yaml_path.push("service.yaml");
 
-                        for encryption_type in &IMAGE_PULL_ENCRYPTION_TYPES {
+                        for encryption_type in &image_pull_encryption_types {
                             env_vars.insert("ENCRYPTION", encryption_type.to_string());
                             image_tag = encryption_type.to_string();
 
-                            for image_pull_type in ImagePullBaselines::iter_variants() {
-                                // TODO: remove me when all image-pull baselines are implemented
-                                let supported_image_pull_types = [
-                                    ImagePullBaselines::GuestPull,
-                                    ImagePullBaselines::GuestLazy,
-                                    ImagePullBaselines::HostMount,
-                                ];
-                                if !supported_image_pull_types.contains(image_pull_type) {
-                                    continue;
-                                }
-
+                            for image_pull_type in &image_pull_types {
                                 // Set the snapshotter mode
                                 match image_pull_type {
                                     ImagePullBaselines::GuestPull
@@ -646,7 +799,7 @@ impl Exp {
                     env_vars.insert("KSERVICE_NAME", "hello-world".to_string());
                     env_vars.insert("IMAGE_NAME", "hello-world".to_string());
                     env_vars.insert("IMAGE_TAG", "unencrypted".to_string());
-                    for flavour in ["cold", "warm"] {
+                    for flavour in &start_up_flavours {
                         env_vars.insert("START_UP_FLAVOUR", flavour.to_string());
                         Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
                     }
