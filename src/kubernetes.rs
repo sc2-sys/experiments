@@ -131,7 +131,9 @@ impl K8s {
         result_str
     }
 
-    fn get_knative_service_ip(service_name: &str) -> String {
+    /// Returns the URL of a knative service without the http prefix. This
+    /// returns something along the lines of service-name.namespace.ip.sslip.io
+    fn get_knative_service_url(service_name: &str) -> String {
         // First, wait until the service is ready
         loop {
             let output = Self::run_kubectl_cmd(
@@ -156,6 +158,14 @@ impl K8s {
                 Env::K8S_NAMESPACE
             )
             .as_str(),
+        ).strip_prefix("http://").unwrap().to_string()
+    }
+
+    /// Returns the ingress URL of the load balancer of the Knative deployment.
+    /// In our case it is provided by Kourier.
+    pub fn get_knative_lb_ip() -> String {
+        Self::run_kubectl_cmd(
+            "-n kourier-system get svc kourier -o jsonpath={.status.loadBalancer.ingress[0].ip}",
         )
     }
 
@@ -224,8 +234,8 @@ impl K8s {
     ) -> String {
         Self::template_yaml_and_run_cmd("apply", yaml_path, env_vars);
 
-        // Return the IP
-        Self::get_knative_service_ip(&env_vars["KSERVICE_NAME"])
+        // Return the URL
+        Self::get_knative_service_url(&env_vars["KSERVICE_NAME"])
     }
 
     /// Get the Knative deployment ID given a service name

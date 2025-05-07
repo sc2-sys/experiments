@@ -850,7 +850,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sc2-eval"
+name = "sc2-exp"
 version = "0.1.0"
 dependencies = [
  "chrono",

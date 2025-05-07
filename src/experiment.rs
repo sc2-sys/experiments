@@ -12,6 +12,7 @@ use crate::{
 use chrono::{DateTime, Duration, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
+use log::warn;
 use std::{
     collections::BTreeMap, fmt, fs, io::Write, path::PathBuf, process::Command, str, thread, time,
 };
@@ -196,8 +197,10 @@ impl Exp {
     fn run_knative_experiment_once(
         _exp: &AvailableExperiments,
         service_name: &str,
-        service_ip: &str,
+        service_url: &str,
     ) -> ExecutionResult {
+        let lb_ip = K8s::get_knative_lb_ip();
+
         // Note that this initialises start_time to Utc::now()
         let mut exec_result = ExecutionResult::new();
 
@@ -210,7 +213,7 @@ impl Exp {
             image_data_path.push("image_data.json");
 
             debug!(
-                "{}: running curl command to ip: {service_ip} with image data: {}",
+                "{}: running curl command to lb ip: {lb_ip} with host: {service_url} and image data: {}",
                 Env::SYS_NAME,
                 format!("@{}", image_data_path.to_string_lossy().into_owned()),
             );
@@ -218,22 +221,25 @@ impl Exp {
             Command::new("curl")
                 .arg("-H")
                 .arg("Content-Type: application/json")
+                .arg(format!("Host: {service_url}/v1/models/mobilenet:predict"))
                 .arg("-d")
                 .arg(format!(
                     "@{}",
                     image_data_path.to_string_lossy().into_owned()
                 ))
-                .arg(format!("{service_ip}/v1/models/mobilenet:predict"))
+                .arg(lb_ip)
                 .output()
                 .expect("sc2-eval(k8s): failed to spawn curl command")
         } else {
             debug!(
-                "{}: running curl command to ip: {service_ip}",
+                "{}: running curl command to lb ip: {lb_ip} with host: {service_url}",
                 Env::SYS_NAME
             );
 
             Command::new("curl")
-                .arg(service_ip)
+                .arg("-H")
+                .arg(format!("Host: {service_url}"))
+                .arg(lb_ip)
                 .output()
                 .expect("sc2-eval(k8s): failed to spawn curl command")
         };
@@ -245,6 +251,12 @@ impl Exp {
                 let stdout = str::from_utf8(&output.stdout)
                     .unwrap_or("sc2-exp(k8s): failed to get stdout")
                     .trim();
+
+                // For some reason, it seems that bad requests do not always
+                // trigger a non-zero return code, so we catch them here
+                if stdout == "Bad Request" {
+                    panic!("{}(k8s): curl received bad request!", Env::SYS_NAME);
+                }
                 debug!("{}(k8s): got '{stdout}'", Env::SYS_NAME);
             }
             Some(code) => {
@@ -253,7 +265,7 @@ impl Exp {
                 let stderr =
                     str::from_utf8(&output.stderr).unwrap_or("sc2-exp(k8s): failed to get stderr");
                 panic!(
-                    "{}(k8s): kubectl exited with error (code: {code}): stdout: {stdout} - stderr: {stderr}",
+                    "{}(k8s): curl exited with error (code: {code}): stdout: {stdout} - stderr: {stderr}",
                     Env::SYS_NAME
                 );
             }
@@ -305,7 +317,8 @@ impl Exp {
         env_vars: &BTreeMap<&str, String>,
     ) {
         // Deploy the baseline
-        let service_ip = K8s::deploy_knative_service(yaml_path, env_vars);
+        let service_url = K8s::deploy_knative_service(yaml_path, env_vars);
+        warn!("service url: {service_url}");
 
         // Cautionary sleep before starting the experiment
         thread::sleep(time::Duration::from_secs(2));
@@ -339,7 +352,7 @@ impl Exp {
 
         // Run the experiment (warm-up)
         for _ in 0..args.num_warmup_repeats {
-            Self::run_knative_experiment_once(exp, &env_vars["KSERVICE_NAME"], &service_ip);
+            Self::run_knative_experiment_once(exp, &env_vars["KSERVICE_NAME"], &service_url);
             Self::clean_up_after_run(exp, env_vars);
         }
 
@@ -374,7 +387,7 @@ impl Exp {
         for i in 0..args.num_repeats {
             // Run experiment
             let mut exec_results =
-                Self::run_knative_experiment_once(exp, &env_vars["KSERVICE_NAME"], &service_ip);
+                Self::run_knative_experiment_once(exp, &env_vars["KSERVICE_NAME"], &service_url);
             Self::clean_up_after_run(exp, env_vars);
 
             // Write results to file
