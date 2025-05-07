@@ -2,7 +2,8 @@ use crate::{
     containerd::Containerd,
     env::Env,
     experiment::{
-        AvailableBaselines, AvailableExperiments, ImagePullBaselines, ImagePullWorkloads, ImagePullEncryptionTypes, StartUpFlavours,
+        AvailableBaselines, AvailableExperiments, ImagePullBaselines, ImagePullEncryptionTypes,
+        ImagePullWorkloads, StartUpFlavours,
     },
 };
 use csv::ReaderBuilder;
@@ -791,8 +792,8 @@ impl Plot {
 
         match exp {
             AvailableExperiments::ImagePull => {
-                for workload in IMAGE_PULL_WORKLOADS {
-                    for encryption_type in IMAGE_PULL_ENCRYPTION_TYPES {
+                for workload in ImagePullWorkloads::iter_variants() {
+                    for encryption_type in ImagePullEncryptionTypes::iter_variants() {
                         Self::plot_image_pull(
                             exp,
                             &data_files,
