@@ -1,260 +1,20 @@
-use crate::{containerd::Containerd, deploy::Deploy, env::Env, kubernetes::K8s};
+use crate::{
+    args::{ImagePullRunArgs, RunCommonArgs, ScaleOutRunArgs, StartUpRunArgs},
+    baselines::{
+        AvailableBaselines, ImagePullBaselines, ImagePullEncryptionTypes, ImagePullWorkloads,
+        StartUpFlavours,
+    },
+    containerd::Containerd,
+    deploy::Deploy,
+    env::Env,
+    kubernetes::K8s,
+};
 use chrono::{DateTime, Duration, Utc};
-use clap::{Args, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
-use plotters::prelude::RGBColor;
 use std::{
-    collections::BTreeMap, fmt, fs, io::Write, path::PathBuf, process::Command, str, str::FromStr,
-    thread, time,
+    collections::BTreeMap, fmt, fs, io::Write, path::PathBuf, process::Command, str, thread, time,
 };
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
-pub enum AvailableBaselines {
-    Runc,
-    Kata,
-    Snp,
-    SnpSc2,
-    Tdx,
-    TdxSc2,
-}
-
-impl fmt::Display for AvailableBaselines {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AvailableBaselines::Runc => write!(f, "runc"),
-            AvailableBaselines::Kata => write!(f, "kata"),
-            AvailableBaselines::Snp => write!(f, "snp"),
-            AvailableBaselines::SnpSc2 => write!(f, "snp-sc2"),
-            AvailableBaselines::Tdx => write!(f, "tdx"),
-            AvailableBaselines::TdxSc2 => write!(f, "tdx-sc2"),
-        }
-    }
-}
-
-impl FromStr for AvailableBaselines {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<AvailableBaselines, Self::Err> {
-        match input {
-            "runc" => Ok(AvailableBaselines::Runc),
-            "kata" => Ok(AvailableBaselines::Kata),
-            "snp" => Ok(AvailableBaselines::Snp),
-            "snp-sc2" => Ok(AvailableBaselines::SnpSc2),
-            "tdx" => Ok(AvailableBaselines::Tdx),
-            "tdx-sc2" => Ok(AvailableBaselines::TdxSc2),
-            _ => Err(()),
-        }
-    }
-}
-
-impl AvailableBaselines {
-    pub fn iter_variants() -> std::slice::Iter<'static, AvailableBaselines> {
-        static VARIANTS: [AvailableBaselines; 6] = [
-            AvailableBaselines::Runc,
-            AvailableBaselines::Kata,
-            AvailableBaselines::Snp,
-            AvailableBaselines::SnpSc2,
-            AvailableBaselines::Tdx,
-            AvailableBaselines::TdxSc2,
-        ];
-        VARIANTS.iter()
-    }
-
-    pub fn get_color(&self) -> RGBColor {
-        match self {
-            AvailableBaselines::Runc => RGBColor(122, 92, 117),
-            AvailableBaselines::Kata => RGBColor(171, 222, 230),
-            AvailableBaselines::Snp => RGBColor(203, 170, 203),
-            AvailableBaselines::SnpSc2 => RGBColor(213, 160, 163),
-            AvailableBaselines::Tdx => RGBColor(255, 255, 181),
-            AvailableBaselines::TdxSc2 => RGBColor(205, 255, 101),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
-pub enum ImagePullBaselines {
-    GuestPull,
-    GuestLazy,
-    HostMount,
-    Sc2,
-}
-
-impl fmt::Display for ImagePullBaselines {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ImagePullBaselines::GuestPull => write!(f, "guest-pull"),
-            ImagePullBaselines::GuestLazy => write!(f, "guest-lazy"),
-            ImagePullBaselines::HostMount => write!(f, "host-mount"),
-            ImagePullBaselines::Sc2 => write!(f, "sc2"),
-        }
-    }
-}
-
-impl FromStr for ImagePullBaselines {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<ImagePullBaselines, Self::Err> {
-        match input {
-            "guest-pull" => Ok(ImagePullBaselines::GuestPull),
-            "guest-lazy" => Ok(ImagePullBaselines::GuestLazy),
-            "host-mount" => Ok(ImagePullBaselines::HostMount),
-            "sc2" => Ok(ImagePullBaselines::Sc2),
-            _ => Err(()),
-        }
-    }
-}
-
-impl ImagePullBaselines {
-    pub fn iter_variants() -> std::slice::Iter<'static, ImagePullBaselines> {
-        static VARIANTS: [ImagePullBaselines; 4] = [
-            ImagePullBaselines::GuestPull,
-            ImagePullBaselines::GuestLazy,
-            ImagePullBaselines::HostMount,
-            ImagePullBaselines::Sc2,
-        ];
-        VARIANTS.iter()
-    }
-}
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
-pub enum StartUpFlavours {
-    Cold,
-    Warm,
-}
-
-impl fmt::Display for StartUpFlavours {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StartUpFlavours::Cold => write!(f, "cold"),
-            StartUpFlavours::Warm => write!(f, "warm"),
-        }
-    }
-}
-
-impl FromStr for StartUpFlavours {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<StartUpFlavours, Self::Err> {
-        match input {
-            "cold" => Ok(StartUpFlavours::Cold),
-            "warm" => Ok(StartUpFlavours::Warm),
-            _ => Err(()),
-        }
-    }
-}
-
-impl StartUpFlavours {
-    pub fn iter_variants() -> std::slice::Iter<'static, StartUpFlavours> {
-        static VARIANTS: [StartUpFlavours; 2] = [StartUpFlavours::Cold, StartUpFlavours::Warm];
-        VARIANTS.iter()
-    }
-}
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
-pub enum ImagePullWorkloads {
-    Fio,
-    HelloWorld,
-    TfInference,
-}
-
-impl fmt::Display for ImagePullWorkloads {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ImagePullWorkloads::Fio => write!(f, "fio"),
-            ImagePullWorkloads::HelloWorld => write!(f, "hello-world"),
-            ImagePullWorkloads::TfInference => write!(f, "tf-inference"),
-        }
-    }
-}
-
-impl FromStr for ImagePullWorkloads {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<ImagePullWorkloads, Self::Err> {
-        match input {
-            "fio" => Ok(ImagePullWorkloads::Fio),
-            "hello-world" => Ok(ImagePullWorkloads::HelloWorld),
-            "tf-inference" => Ok(ImagePullWorkloads::TfInference),
-            _ => Err(()),
-        }
-    }
-}
-
-impl ImagePullWorkloads {
-    pub fn iter_variants() -> std::slice::Iter<'static, ImagePullWorkloads> {
-        static VARIANTS: [ImagePullWorkloads; 3] = [
-            ImagePullWorkloads::Fio,
-            ImagePullWorkloads::HelloWorld,
-            ImagePullWorkloads::TfInference,
-        ];
-        VARIANTS.iter()
-    }
-}
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
-pub enum ImagePullEncryptionTypes {
-    Encrypted,
-    UnEncrypted,
-}
-
-impl fmt::Display for ImagePullEncryptionTypes {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ImagePullEncryptionTypes::Encrypted => write!(f, "encrypted"),
-            ImagePullEncryptionTypes::UnEncrypted => write!(f, "unencrypted"),
-        }
-    }
-}
-
-impl FromStr for ImagePullEncryptionTypes {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<ImagePullEncryptionTypes, Self::Err> {
-        match input {
-            "encrypted" => Ok(ImagePullEncryptionTypes::Encrypted),
-            "unencrypted" => Ok(ImagePullEncryptionTypes::UnEncrypted),
-            _ => Err(()),
-        }
-    }
-}
-
-impl ImagePullEncryptionTypes {
-    pub fn iter_variants() -> std::slice::Iter<'static, ImagePullEncryptionTypes> {
-        static VARIANTS: [ImagePullEncryptionTypes; 2] = [
-            ImagePullEncryptionTypes::Encrypted,
-            ImagePullEncryptionTypes::UnEncrypted,
-        ];
-        VARIANTS.iter()
-    }
-}
-
-#[derive(Debug, Args)]
-pub struct ExpRunArgs {
-    #[arg(long, num_args = 1.., value_name = "BASELINE")]
-    baseline: Vec<AvailableBaselines>,
-    #[arg(long, default_value = "3")]
-    num_repeats: u32,
-    #[arg(long, default_value = "1")]
-    num_warmup_repeats: u32,
-
-    // TODO(scale-out): probably remove this parameter
-    #[arg(long, default_value = "4")]
-    scale_up_range: u32,
-
-    // Optional arguments for all experiments
-    #[arg(long, value_name = "STARTUP_FLAVOUR")]
-    flavour: Option<StartUpFlavours>,
-
-    // Optional arguments for `image-pull` experiment
-    #[arg(long)]
-    image_pull_type: Option<ImagePullBaselines>,
-    #[arg(long)]
-    image_pull_workload: Option<ImagePullWorkloads>,
-    #[arg(long)]
-    image_pull_encryption: Option<ImagePullEncryptionTypes>,
-}
 
 #[derive(PartialEq)]
 pub enum AvailableExperiments {
@@ -540,7 +300,7 @@ impl Exp {
     /// according to the requested experiment, using the given run args
     fn run_knative_experiment(
         exp: &AvailableExperiments,
-        args: &ExpRunArgs,
+        args: &RunCommonArgs,
         yaml_path: &PathBuf,
         env_vars: &BTreeMap<&str, String>,
     ) {
@@ -628,19 +388,11 @@ impl Exp {
         K8s::delete_knative_service(yaml_path, env_vars);
     }
 
-    /// Main entrypoint to execute an experiment in SC2. We iterate over the
-    /// different baselines to run, as well as the different experiment args
-    /// for each experiment, and populate a map of env. vars to template
-    /// the serivce's YAML path. Once we have a single templated yaml path,
-    /// we can call run_knative_experiment to handle the deployment, execution,
-    /// clean-up, and result aggregation
-    pub fn run(exp: &AvailableExperiments, args: &ExpRunArgs) {
-        // Some experiments only use a fixed baseline
-        let baselines = match exp {
-            AvailableExperiments::ImagePull => vec![AvailableBaselines::SnpSc2],
-            _ => args.baseline.clone(),
-        };
+    // -------------------------------------------------------------------------
+    // Main entrypoints to run experiments
+    // -------------------------------------------------------------------------
 
+    pub fn run_start_up(args: &StartUpRunArgs) {
         // Work-out the start-up flavour
         let start_up_flavours = args
             .flavour
@@ -648,30 +400,12 @@ impl Exp {
             .map(|val| vec![val])
             .unwrap_or_else(|| vec![StartUpFlavours::Cold, StartUpFlavours::Warm]);
 
-        for baseline in &baselines {
+        for baseline in &args.baseline {
             // Work-out the Knative service to deploy
-            let mut apps_root = Env::apps_root();
-
-            let yaml_path: PathBuf = match &exp {
-                // For ImagePull experiment, we will use different YAML
-                // paths depending on the experiment we are running
-                AvailableExperiments::ImagePull => {
-                    apps_root.push("functions");
-                    apps_root
-                }
-                AvailableExperiments::ScaleOut => {
-                    apps_root.push("functions");
-                    apps_root.push("helloworld-py-scaleout");
-                    apps_root.push("service.yaml");
-                    apps_root
-                }
-                AvailableExperiments::StartUp => {
-                    apps_root.push("functions");
-                    apps_root.push("hello-world");
-                    apps_root.push("service.yaml");
-                    apps_root
-                }
-            };
+            let yaml_path = Env::apps_root()
+                .join("functions")
+                .join("hello-world")
+                .join("service.yaml");
 
             // Work-out the env. vars that we need to template in the service file
             let mut env_vars: BTreeMap<&str, String> = BTreeMap::from([
@@ -689,122 +423,206 @@ impl Exp {
                         AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
                     },
                 ),
+                ("KSERVICE_NAME", "hello-world".to_string()),
+                ("IMAGE_NAME", "hello-world".to_string()),
+                ("IMAGE_TAG", "unencrypted".to_string()),
             ]);
 
             // Per-experiment env. var templating and execution
-            match &exp {
-                AvailableExperiments::ImagePull => {
-                    // Work-out the image pull type
-                    let image_pull_types = args
-                        .image_pull_type
-                        .clone()
-                        .map(|val| vec![val])
-                        .unwrap_or_else(|| {
-                            vec![
-                                ImagePullBaselines::GuestPull,
-                                ImagePullBaselines::GuestLazy,
-                                ImagePullBaselines::HostMount,
-                            ]
-                        });
+            for flavour in &start_up_flavours {
+                env_vars.insert("START_UP_FLAVOUR", flavour.to_string());
+                Self::run_knative_experiment(
+                    &AvailableExperiments::StartUp,
+                    &args.common,
+                    &yaml_path,
+                    &env_vars,
+                );
+            }
+        }
+    }
 
-                    // Work-out the image pull workload
-                    let image_pull_workloads = args
-                        .image_pull_workload
-                        .clone()
-                        .map(|val| vec![val])
-                        .unwrap_or_else(|| {
-                            vec![
-                                ImagePullWorkloads::HelloWorld,
-                                ImagePullWorkloads::Fio,
-                                ImagePullWorkloads::TfInference,
-                            ]
-                        });
+    pub fn run_scale_out(args: &ScaleOutRunArgs) {
+        // TODO: think if we want different start-up flavours for scale-out
+        let start_up_flavour = StartUpFlavours::Cold;
 
-                    // Work-out the image pull encryption
-                    let image_pull_encryption_types = args
-                        .image_pull_encryption
-                        .clone()
-                        .map(|val| vec![val])
-                        .unwrap_or_else(|| {
-                            vec![
-                                // ImagePullEncryptionTypes::Encrypted,
-                                ImagePullEncryptionTypes::UnEncrypted,
-                            ]
-                        });
+        // TODO: think if we want different baselines for scale-out
+        for baseline in &args.baseline {
+            // Work-out the Knative service to deploy
+            let yaml_path = Env::apps_root()
+                .join("functions")
+                .join("hello-world-scale-out")
+                .join("service.yaml");
 
-                    let mut image_tag: String;
-                    for workload in &image_pull_workloads {
-                        env_vars.insert("WORKLOAD", workload.to_string());
-                        env_vars.insert("KSERVICE_NAME", workload.to_string());
-                        env_vars.insert("IMAGE_NAME", workload.to_string());
+            // Work-out the env. vars that we need to template in the service file
+            let mut env_vars: BTreeMap<&str, String> = BTreeMap::from([
+                ("SC2_BASELINE", format!("{baseline}")),
+                ("SC2_NAMESPACE", Env::K8S_NAMESPACE.to_string()),
+                ("CTR_REGISTRY_URL", Env::CONTAINER_REGISTRY_URL.to_string()),
+                (
+                    "RUNTIME_CLASS_NAME",
+                    match baseline {
+                        AvailableBaselines::Runc => "runc".to_string(),
+                        AvailableBaselines::Kata => "kata-qemu".to_string(),
+                        AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
+                        AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
+                        AvailableBaselines::Tdx => "kata-qemu-tdx".to_string(),
+                        AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
+                    },
+                ),
+                ("KSERVICE_NAME", "hello-world".to_string()),
+                ("IMAGE_NAME", "hello-world".to_string()),
+                ("IMAGE_TAG", "unencrypted".to_string()),
+                ("START_UP_FLAVOUR", start_up_flavour.to_string()),
+            ]);
 
-                        // Update YAML path
-                        let mut this_yaml_path = yaml_path.clone();
-                        this_yaml_path.push(workload.to_string());
-                        this_yaml_path.push("service.yaml");
+            for i in 1..args.scale_up_range {
+                env_vars.insert("SCALE_IDX", i.to_string());
+                Self::run_knative_experiment(
+                    &AvailableExperiments::ScaleOut,
+                    &args.common,
+                    &yaml_path,
+                    &env_vars,
+                );
+            }
+        }
+    }
 
-                        for encryption_type in &image_pull_encryption_types {
-                            env_vars.insert("ENCRYPTION", encryption_type.to_string());
-                            image_tag = encryption_type.to_string();
+    /// In this experiment we measure the overheads of different image-pull
+    /// mechanisms. We compare the default guest-pull mechanisms, with a
+    /// mechanism to mount images from the host using dm-verity, and an
+    /// extensions of the guest-pull mechanism that uses lazy-pulling as
+    /// enabled by the nydus image format.
+    ///
+    /// For each image-pull mechanism we compare encrypted and unencrypted
+    /// images, and cold and warm starts. We also use three different
+    /// workloads.
+    pub fn run_image_pull(args: &ImagePullRunArgs) {
+        let yaml_path: PathBuf = Env::apps_root().join("functions");
+        let baseline = AvailableBaselines::SnpSc2;
 
-                            for image_pull_type in &image_pull_types {
-                                // Set the snapshotter mode
-                                match image_pull_type {
-                                    ImagePullBaselines::GuestPull
-                                    | ImagePullBaselines::GuestLazy => {
-                                        Deploy::set_snapshotter_mode("guest-pull");
-                                    }
-                                    ImagePullBaselines::HostMount => {
-                                        Deploy::set_snapshotter_mode("host-share");
-                                    }
-                                    _ => todo!(),
-                                }
+        // ---------------------------------------------------------------------
+        // Parse command line arguments
+        //
+        // For each configuration knob, we allow manually selecting one option
+        // or, if not, using an array of default values
+        // ---------------------------------------------------------------------
 
-                                // Purge to ensure a fresh start with the
-                                // new snapshotter
-                                Deploy::purge_snapshotters();
+        let start_up_flavours = args
+            .flavour
+            .clone()
+            .map(|val| vec![val])
+            .unwrap_or_else(|| vec![StartUpFlavours::Cold, StartUpFlavours::Warm]);
 
-                                // Work-out the image tag based on the pull type
-                                // and update the yaml path
-                                if image_pull_type == &ImagePullBaselines::GuestLazy {
-                                    image_tag += "-nydus";
-                                }
+        let image_pull_types = args
+            .image_pull_type
+            .clone()
+            .map(|val| vec![val])
+            .unwrap_or_else(|| {
+                vec![
+                    ImagePullBaselines::GuestPull,
+                    ImagePullBaselines::GuestLazy,
+                    ImagePullBaselines::HostMount,
+                ]
+            });
 
-                                env_vars.insert("IMAGE_PULL_TYPE", image_pull_type.to_string());
-                                env_vars.insert("IMAGE_TAG", image_tag.clone());
+        let image_pull_workloads = args
+            .image_pull_workload
+            .clone()
+            .map(|val| vec![val])
+            .unwrap_or_else(|| {
+                vec![
+                    ImagePullWorkloads::HelloWorld,
+                    ImagePullWorkloads::Fio,
+                    ImagePullWorkloads::TfInference,
+                ]
+            });
 
-                                for start_up_flavour in &start_up_flavours {
-                                    env_vars
-                                        .insert("START_UP_FLAVOUR", start_up_flavour.to_string());
+        let image_pull_encryption_types = args
+            .image_pull_encryption
+            .clone()
+            .map(|val| vec![val])
+            .unwrap_or_else(|| {
+                vec![
+                    // TODO: enable image encryption
+                    // ImagePullEncryptionTypes::Encrypted,
+                    ImagePullEncryptionTypes::UnEncrypted,
+                ]
+            });
 
-                                    Self::run_knative_experiment(
-                                        exp,
-                                        args,
-                                        &this_yaml_path,
-                                        &env_vars,
-                                    );
-                                }
-                            }
+        // ---------------------------------------------------------------------
+        // Run experiments
+        // ---------------------------------------------------------------------
+
+        let mut env_vars: BTreeMap<&str, String> = BTreeMap::from([
+            ("SC2_BASELINE", format!("{baseline}")),
+            ("SC2_NAMESPACE", Env::K8S_NAMESPACE.to_string()),
+            ("CTR_REGISTRY_URL", Env::CONTAINER_REGISTRY_URL.to_string()),
+            (
+                "RUNTIME_CLASS_NAME",
+                match baseline {
+                    AvailableBaselines::Runc => "runc".to_string(),
+                    AvailableBaselines::Kata => "kata-qemu".to_string(),
+                    AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
+                    AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
+                    AvailableBaselines::Tdx => "kata-qemu-tdx".to_string(),
+                    AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
+                },
+            ),
+        ]);
+
+        for workload in &image_pull_workloads {
+            let mut image_tag: String;
+
+            env_vars.insert("WORKLOAD", workload.to_string());
+            env_vars.insert("KSERVICE_NAME", workload.to_string());
+            env_vars.insert("IMAGE_NAME", workload.to_string());
+
+            // Update YAML path
+            let mut this_yaml_path = yaml_path.clone();
+            this_yaml_path.push(workload.to_string());
+            this_yaml_path.push("service.yaml");
+
+            for encryption_type in &image_pull_encryption_types {
+                env_vars.insert("ENCRYPTION", encryption_type.to_string());
+                image_tag = encryption_type.to_string();
+
+                for image_pull_type in &image_pull_types {
+                    // Set the snapshotter mode
+                    match image_pull_type {
+                        ImagePullBaselines::GuestPull | ImagePullBaselines::GuestLazy => {
+                            Deploy::set_snapshotter_mode("guest-pull");
                         }
+                        ImagePullBaselines::HostMount => {
+                            Deploy::set_snapshotter_mode("host-share");
+                        }
+                        _ => todo!(),
+                    }
+
+                    // Purge to ensure a fresh start with the
+                    // new snapshotter
+                    Deploy::purge_snapshotters();
+
+                    // Work-out the image tag based on the pull type
+                    // and update the yaml path
+                    if image_pull_type == &ImagePullBaselines::GuestLazy {
+                        image_tag += "-nydus";
+                    }
+
+                    env_vars.insert("IMAGE_PULL_TYPE", image_pull_type.to_string());
+                    env_vars.insert("IMAGE_TAG", image_tag.clone());
+
+                    for start_up_flavour in &start_up_flavours {
+                        env_vars.insert("START_UP_FLAVOUR", start_up_flavour.to_string());
+
+                        Self::run_knative_experiment(
+                            &AvailableExperiments::ImagePull,
+                            &args.common,
+                            &this_yaml_path,
+                            &env_vars,
+                        );
                     }
                 }
-                AvailableExperiments::ScaleOut => {
-                    env_vars.insert("KSERVICE_NAME", "hello-world".to_string());
-                    for i in 1..args.scale_up_range {
-                        env_vars.insert("SCALE_IDX", i.to_string());
-                        Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
-                    }
-                }
-                AvailableExperiments::StartUp => {
-                    env_vars.insert("KSERVICE_NAME", "hello-world".to_string());
-                    env_vars.insert("IMAGE_NAME", "hello-world".to_string());
-                    env_vars.insert("IMAGE_TAG", "unencrypted".to_string());
-                    for flavour in &start_up_flavours {
-                        env_vars.insert("START_UP_FLAVOUR", flavour.to_string());
-                        Self::run_knative_experiment(exp, args, &yaml_path, &env_vars);
-                    }
-                }
-            };
+            }
         }
     }
 }

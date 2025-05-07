@@ -1,10 +1,11 @@
 use crate::{
+    baselines::{
+        AvailableBaselines, ImagePullBaselines, ImagePullEncryptionTypes, ImagePullWorkloads,
+        StartUpFlavours,
+    },
     containerd::Containerd,
     env::Env,
-    experiment::{
-        AvailableBaselines, AvailableExperiments, ImagePullBaselines, ImagePullEncryptionTypes,
-        ImagePullWorkloads, StartUpFlavours,
-    },
+    experiment::AvailableExperiments,
 };
 use csv::ReaderBuilder;
 use log::debug;
