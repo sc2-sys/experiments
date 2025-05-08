@@ -11,6 +11,7 @@
 This repository contains the experiment scripts for SC2. To prepare your
 environment, first [deploy](https://github.com/sc2-sys/deploy) an SC2 cluster,
 and upload all the benchmark [applications](https://github.com/sc2-sys/applications).
+We assume that the both repos are checked-out in `../deploy` and `../applications` respectively.
 
 You may then navigate to any of the different experiments:
 * [image-pull](./results/start-up/README.md) - explore different image-pulling mechanisms in SC2.

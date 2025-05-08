@@ -2,7 +2,6 @@
 
 THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]:-${(%):-%x}}" )" >/dev/null 2>&1 && pwd )"
 PROJ_ROOT="${THIS_DIR}/.."
-RUST_ROOT="${PROJ_ROOT}/invrs"
 
 pushd ${PROJ_ROOT}>>/dev/null
 
@@ -19,7 +18,13 @@ alias sc2-exp="cargo run -q --"
 # SC2 deployment variables
 # ----------------------------
 
-export SC2_DEPLOY_SOURCE=~/git/sc2-sys/deploy
+if [ ! -d "${PROJ_ROOT}/../deploy" ]; then
+    echo "ERROR: expected sc2-sys/deploy to be checked-out in ../deploy"
+    echo "ERROR: clone the repo and run 'inv sc2.deploy --clean' before running this command again"
+    exit 1
+fi
+
+export SC2_DEPLOY_SOURCE="${PROJ_ROOT}/../deploy"
 export KUBECONFIG=${SC2_DEPLOY_SOURCE}/.config/kubeadm_kubeconfig
 alias k9s=${SC2_DEPLOY_SOURCE}/bin/k9s
 alias kubectl=${SC2_DEPLOY_SOURCE}/bin/kubectl
