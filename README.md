@@ -8,7 +8,11 @@
   <hr>
 </div>
 
-This repository contains the experiment scripts for SC2. You may navigate
-to any of the different experiments:
-* [start-up](./results/start-up/README.md) - measure the start-up latency for SC2.
+This repository contains the experiment scripts for SC2. To prepare your
+environment, first [deploy](https://github.com/sc2-sys/deploy) an SC2 cluster,
+and upload all the benchmark [applications](https://github.com/sc2-sys/applications).
+
+You may then navigate to any of the different experiments:
+* [image-pull](./results/start-up/README.md) - explore different image-pulling mechanisms in SC2.
 * [scale-out](./results/scale-out/README.md) - measure the scale-out latency for SC2.
+* [start-up](./results/start-up/README.md) - measure the start-up latency for SC2.

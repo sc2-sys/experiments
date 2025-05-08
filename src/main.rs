@@ -1,9 +1,15 @@
-use crate::experiment::{AvailableExperiments, Exp, ExpRunArgs};
-use crate::plot::Plot;
-use clap::{Parser, Subcommand};
+use crate::{
+    args::{ExpCommand, ImagePullSubCommand, ScaleOutSubCommand, StartUpSubCommand},
+    experiment::{AvailableExperiments, Exp},
+    plot::Plot,
+};
+use clap::Parser;
 
+pub mod args;
+pub mod baselines;
 pub mod containerd;
 pub mod cri;
+pub mod deploy;
 pub mod env;
 pub mod experiment;
 pub mod kubernetes;
@@ -19,30 +25,10 @@ struct Cli {
     debug: bool,
 }
 
-#[derive(Debug, Subcommand)]
-enum ExpSubCommand {
-    /// Run
-    Run(ExpRunArgs),
-    /// Plot
-    Plot {},
-}
-
-#[derive(Debug, Subcommand)]
-enum ExpCommand {
-    /// Evaluate the start-up latency
-    StartUp {
-        #[command(subcommand)]
-        exp_sub_command: ExpSubCommand,
-    },
-    /// Evaluate scale-out latency
-    ScaleOut {
-        #[command(subcommand)]
-        exp_sub_command: ExpSubCommand,
-    },
-}
-
 fn main() {
     let cli = Cli::parse();
+
+    // TODO: make sure that all application images exist in the container registry
 
     // Initialize the logger based on the debug flag
     if cli.debug {
@@ -56,23 +42,33 @@ fn main() {
     }
 
     match &cli.task {
+        ExpCommand::ImagePull {
+            exp_sub_command: eval_sub_command,
+        } => match eval_sub_command {
+            ImagePullSubCommand::Run(run_args) => {
+                Exp::run_image_pull(run_args);
+            }
+            ImagePullSubCommand::Plot {} => {
+                Plot::plot(&AvailableExperiments::ImagePull);
+            }
+        },
         ExpCommand::ScaleOut {
             exp_sub_command: eval_sub_command,
         } => match eval_sub_command {
-            ExpSubCommand::Run(run_args) => {
-                Exp::run(&AvailableExperiments::ScaleOut, run_args);
+            ScaleOutSubCommand::Run(run_args) => {
+                Exp::run_scale_out(run_args);
             }
-            ExpSubCommand::Plot {} => {
+            ScaleOutSubCommand::Plot {} => {
                 Plot::plot(&AvailableExperiments::ScaleOut);
             }
         },
         ExpCommand::StartUp {
             exp_sub_command: eval_sub_command,
         } => match eval_sub_command {
-            ExpSubCommand::Run(run_args) => {
-                Exp::run(&AvailableExperiments::StartUp, run_args);
+            StartUpSubCommand::Run(run_args) => {
+                Exp::run_start_up(run_args);
             }
-            ExpSubCommand::Plot {} => {
+            StartUpSubCommand::Plot {} => {
                 Plot::plot(&AvailableExperiments::StartUp);
             }
         },
