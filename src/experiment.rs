@@ -12,7 +12,6 @@ use crate::{
 use chrono::{DateTime, Duration, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
-use log::warn;
 use std::{
     collections::BTreeMap, fmt, fs, io::Write, path::PathBuf, process::Command, str, thread, time,
 };
@@ -318,7 +317,6 @@ impl Exp {
     ) {
         // Deploy the baseline
         let service_url = K8s::deploy_knative_service(yaml_path, env_vars);
-        warn!("service url: {service_url}");
 
         // Cautionary sleep before starting the experiment
         thread::sleep(time::Duration::from_secs(2));
@@ -527,7 +525,7 @@ impl Exp {
             .unwrap_or_else(|| vec![StartUpFlavours::Cold, StartUpFlavours::Warm]);
 
         let image_pull_types = args
-            .image_pull_type
+            .pull_type
             .clone()
             .map(|val| vec![val])
             .unwrap_or_else(|| {
@@ -538,20 +536,20 @@ impl Exp {
                 ]
             });
 
-        let image_pull_workloads = args
-            .image_pull_workload
-            .clone()
-            .map(|val| vec![val])
-            .unwrap_or_else(|| {
-                vec![
-                    ImagePullWorkloads::HelloWorld,
-                    ImagePullWorkloads::Fio,
-                    ImagePullWorkloads::TfInference,
-                ]
-            });
+        let image_pull_workloads =
+            args.workload
+                .clone()
+                .map(|val| vec![val])
+                .unwrap_or_else(|| {
+                    vec![
+                        ImagePullWorkloads::HelloWorld,
+                        ImagePullWorkloads::Fio,
+                        ImagePullWorkloads::TfInference,
+                    ]
+                });
 
         let image_pull_encryption_types = args
-            .image_pull_encryption
+            .encryption
             .clone()
             .map(|val| vec![val])
             .unwrap_or_else(|| {

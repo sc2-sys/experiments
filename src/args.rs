@@ -39,11 +39,11 @@ pub struct ImagePullRunArgs {
     #[arg(long, value_name = "STARTUP_FLAVOUR")]
     pub flavour: Option<StartUpFlavours>,
     #[arg(long)]
-    pub image_pull_type: Option<ImagePullBaselines>,
+    pub pull_type: Option<ImagePullBaselines>,
     #[arg(long)]
-    pub image_pull_workload: Option<ImagePullWorkloads>,
+    pub workload: Option<ImagePullWorkloads>,
     #[arg(long)]
-    pub image_pull_encryption: Option<ImagePullEncryptionTypes>,
+    pub encryption: Option<ImagePullEncryptionTypes>,
 }
 
 #[derive(Debug, Subcommand)]
