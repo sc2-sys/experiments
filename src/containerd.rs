@@ -6,8 +6,9 @@ use regex::Regex;
 use serde_json::Value;
 use std::process::{Command, Stdio};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     io::{BufRead, BufReader},
+    sync::LazyLock,
 };
 
 #[derive(Debug)]
@@ -37,17 +38,35 @@ impl Containerd {
         "FuncRuntime",                 // Fake event that we add to measure function execution time
     ];
 
+    pub const CB_COLORS: LazyLock<HashMap<&'static str, RGBColor>> =
+        LazyLock::new(|| {
+            let mut m = HashMap::new();
+
+            m.insert("blue", RGBColor(0, 114, 178));          // #0072B2
+            m.insert("orange", RGBColor(230, 159, 0));        // #E69F00
+            m.insert("sky_blue", RGBColor(86, 180, 233));     // #56B4E9
+            m.insert("yellow", RGBColor(240, 228, 66));       // #F0E442
+            m.insert("vermillion", RGBColor(213, 94, 0));     // #D55E00
+            m.insert("bluish_green", RGBColor(0, 158, 115));  // #009E73
+            m.insert("reddish_purple", RGBColor(204, 121, 167)); // #CC79A7
+            m.insert("gray", RGBColor(153, 153, 153));        // #999999
+            m.insert("dark_teal", RGBColor(0, 114, 178));     // #0072B2
+            m.insert("brown", RGBColor(139, 69, 19));         // #8B4513
+
+            m
+        });
+
     pub fn get_color_for_event(event: &str) -> RGBColor {
         match event {
-            "StartUp" => RGBColor(102, 102, 255),
-            "EndToEnd" => RGBColor(102, 102, 255),
-            "RunPodSandbox" => RGBColor(102, 255, 178),
-            "PullImage" => RGBColor(245, 161, 66),
-            "CreateContainerUserContainer" => RGBColor(255, 102, 178),
-            "CreateContainerQueueProxy" => RGBColor(255, 102, 178),
-            "StartContainerUserContainer" => RGBColor(255, 255, 102),
-            "StartContainerQueueProxy" => RGBColor(255, 255, 102),
-            "FuncRuntime" => RGBColor(50, 50, 142),
+            "StartUp" => Self::CB_COLORS.get("blue"),
+            "EndToEnd" => Self::CB_COLORS.get("orange"),
+            "RunPodSandbox" => Self::CB_COLORS.get("sky_blue"),
+            "PullImage" => Self::CB_COLORS.get("yellow"),
+            "CreateContainerUserContainer" => Self::CB_COLORS.get("vermillion"),
+            "CreateContainerQueueProxy" => Self::CB_COLORS.get("bluish_green"),
+            "StartContainerUserContainer" => Self::CB_COLORS.get("reddish_purple"),
+            "StartContainerQueueProxy" => Self::CB_COLORS.get("reddish_purple"),
+            "FuncRuntime" => Self::CB_COLORS.get("gray"),
             _ => panic!("{}(containerd): unrecognised event: {event}", Env::SYS_NAME),
         }
     }
