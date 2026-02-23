@@ -62,11 +62,11 @@ impl Containerd {
             "EndToEnd" => *Self::CB_COLORS.get("orange").unwrap(),
             "RunPodSandbox" => *Self::CB_COLORS.get("sky_blue").unwrap(),
             "PullImage" => *Self::CB_COLORS.get("yellow").unwrap(),
-            "CreateContainerUserContainer" => *Self::CB_COLORS.get("vermillion").unwrap(),
+            "CreateContainerUserContainer" => *Self::CB_COLORS.get("yellow").unwrap(),
             "CreateContainerQueueProxy" => *Self::CB_COLORS.get("bluish_green").unwrap(),
             "StartContainerUserContainer" => *Self::CB_COLORS.get("reddish_purple").unwrap(),
             "StartContainerQueueProxy" => *Self::CB_COLORS.get("reddish_purple").unwrap(),
-            "FuncRuntime" => *Self::CB_COLORS.get("gray").unwrap(),
+            "FuncRuntime" => *Self::CB_COLORS.get("blue").unwrap(),
             _ => panic!("{}(containerd): unrecognised event: {event}", Env::SYS_NAME),
         }
     }

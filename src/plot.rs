@@ -100,7 +100,7 @@ impl Plot {
                 StartUpFlavours::Warm => &mut warm_data,
             };
 
-            debug!("Reading data for baseline: {workload}-{encryption_type}/{pull_type}/{flavour} (file: {csv_file:?}");
+            log::info!("Reading data for baseline: {workload}-{encryption_type}/{pull_type}/{flavour} (file: {csv_file:?}");
 
             // Open the CSV and deserialize records
             let mut reader = ReaderBuilder::new()
@@ -149,6 +149,7 @@ impl Plot {
 
         // FIXME: For the pull types that are stil not implemented, we manually
         // insert the orchestration time
+        /*
         cold_data
             .get_mut(&ImagePullBaselines::Sc2)
             .unwrap()
@@ -157,6 +158,7 @@ impl Plot {
             .get_mut(&ImagePullBaselines::Sc2)
             .unwrap()
             .insert("Orchestration", 0.0);
+        */
 
         // ---------- Plot Data ---------- //
 
@@ -336,10 +338,10 @@ impl Plot {
         // Manually draw the x-axis labels with a custom font and size
         fn xaxis_pos_for_baseline(image_pull_baseline: &ImagePullBaselines) -> i32 {
             match image_pull_baseline {
-                ImagePullBaselines::GuestPull => 80,
-                ImagePullBaselines::GuestLazy => 200,
-                ImagePullBaselines::HostMount => 360,
-                ImagePullBaselines::Sc2 => 510,
+                ImagePullBaselines::GuestPull => 100,
+                ImagePullBaselines::GuestLazy => 280,
+                ImagePullBaselines::HostMount => 450,
+                // ImagePullBaselines::Sc2 => 510,
             }
         }
 
@@ -399,8 +401,9 @@ impl Plot {
         }
 
         // Manually draw cold/warm labels for one bar
+        /*
         root.draw(&Text::new(
-            format!("{}", StartUpFlavours::Warm),
+            format!("{}", StartUpFlavours::Cold),
             (75, 90),
             ("sans-serif", 14).into_font(),
         ))
@@ -411,6 +414,7 @@ impl Plot {
             ("sans-serif", 14).into_font(),
         ))
         .unwrap();
+        */
 
         println!(
             "{}(plot): generated plot at: {}",
@@ -766,6 +770,7 @@ impl Plot {
         }
 
         // Manually draw cold/warm labels for one bar
+        /*
         root.draw(&Text::new(
             format!("{}", StartUpFlavours::Cold),
             (60, 300),
@@ -778,6 +783,7 @@ impl Plot {
             ("sans-serif", 14).into_font(),
         ))
         .unwrap();
+        */
 
         println!(
             "{}(plot): generated plot at: {}",
@@ -1015,7 +1021,7 @@ impl Plot {
         match exp {
             AvailableExperiments::ImagePull => {
                 for workload in ImagePullWorkloads::iter_variants() {
-                    for encryption_type in ImagePullEncryptionTypes::iter_variants() {
+                    for encryption_type in [ImagePullEncryptionTypes::UnEncrypted] {
                         Self::plot_image_pull(
                             exp,
                             &data_files,

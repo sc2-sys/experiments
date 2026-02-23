@@ -71,7 +71,7 @@ pub enum ImagePullBaselines {
     GuestPull,
     GuestLazy,
     HostMount,
-    Sc2,
+    // Sc2,
 }
 
 impl fmt::Display for ImagePullBaselines {
@@ -80,7 +80,7 @@ impl fmt::Display for ImagePullBaselines {
             ImagePullBaselines::GuestPull => write!(f, "guest-pull"),
             ImagePullBaselines::GuestLazy => write!(f, "guest-lazy"),
             ImagePullBaselines::HostMount => write!(f, "host-mount"),
-            ImagePullBaselines::Sc2 => write!(f, "sc2"),
+            // ImagePullBaselines::Sc2 => write!(f, "sc2"),
         }
     }
 }
@@ -93,7 +93,7 @@ impl FromStr for ImagePullBaselines {
             "guest-pull" => Ok(ImagePullBaselines::GuestPull),
             "guest-lazy" => Ok(ImagePullBaselines::GuestLazy),
             "host-mount" => Ok(ImagePullBaselines::HostMount),
-            "sc2" => Ok(ImagePullBaselines::Sc2),
+            // "sc2" => Ok(ImagePullBaselines::Sc2),
             _ => Err(()),
         }
     }
@@ -101,11 +101,11 @@ impl FromStr for ImagePullBaselines {
 
 impl ImagePullBaselines {
     pub fn iter_variants() -> std::slice::Iter<'static, ImagePullBaselines> {
-        static VARIANTS: [ImagePullBaselines; 4] = [
+        static VARIANTS: [ImagePullBaselines; 3] = [
             ImagePullBaselines::GuestPull,
             ImagePullBaselines::GuestLazy,
             ImagePullBaselines::HostMount,
-            ImagePullBaselines::Sc2,
+            // ImagePullBaselines::Sc2,
         ];
         VARIANTS.iter()
     }

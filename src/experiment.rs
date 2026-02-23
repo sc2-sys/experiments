@@ -606,7 +606,7 @@ impl Exp {
                         ImagePullBaselines::HostMount => {
                             Deploy::set_snapshotter_mode("host-share");
                         }
-                        _ => todo!(),
+                        // _ => todo!(),
                     }
 
                     // Purge to ensure a fresh start with the
