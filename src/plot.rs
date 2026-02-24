@@ -12,6 +12,7 @@ use log::debug;
 use plotters::prelude::*;
 use serde::Deserialize;
 use std::{collections::BTreeMap, fs, path::PathBuf};
+const FONT_SIZE: usize = 15;
 
 #[derive(Debug)]
 pub struct Plot {}
@@ -430,6 +431,13 @@ impl Plot {
             time_ms: u64,
         }
 
+        let baselines = [
+            AvailableBaselines::Runc,
+            AvailableBaselines::Kata,
+            AvailableBaselines::Snp,
+            AvailableBaselines::Tdx,
+        ];
+
         // ---------- Collect Data ---------- //
 
         // This map has one key per baseline, and each baseline holds a map
@@ -437,20 +445,20 @@ impl Plot {
         // Note: we stack averages together, which may not be the most
         // statistically-wise thing.
         let mut cold_data = BTreeMap::<AvailableBaselines, BTreeMap<&str, f64>>::new();
-        for workflow in AvailableBaselines::iter_variants() {
+        for baseline in baselines.iter() {
             let mut inner_map = BTreeMap::<&str, f64>::new();
             for event in Containerd::CONTAINERD_INFO_EVENTS {
                 inner_map.insert(event, 0.0);
             }
-            cold_data.insert(workflow.clone(), inner_map);
+            cold_data.insert(baseline.clone(), inner_map);
         }
         let mut warm_data = BTreeMap::<AvailableBaselines, BTreeMap<&str, f64>>::new();
-        for workflow in AvailableBaselines::iter_variants() {
+        for baseline in baselines.iter() {
             let mut inner_map = BTreeMap::<&str, f64>::new();
             for event in Containerd::CONTAINERD_INFO_EVENTS {
                 inner_map.insert(event, 0.0);
             }
-            warm_data.insert(workflow.clone(), inner_map);
+            warm_data.insert(baseline.clone(), inner_map);
         }
 
         let mut y_max: f64 = 25.0e3;
@@ -459,14 +467,19 @@ impl Plot {
                 .file_name()
                 .and_then(|f| f.to_str())
                 .unwrap_or_default();
-            let file_name_len = file_name.len();
-            let file_name_no_ext = &file_name[0..file_name_len - 4];
-            let baseline: AvailableBaselines = file_name_no_ext.split('_').collect::<Vec<_>>()[0]
-                .parse()
-                .unwrap();
-            let flavour: StartUpFlavours = file_name_no_ext.split('_').collect::<Vec<_>>()[1]
-                .parse()
-                .unwrap();
+            let file_name_no_ext = &file_name[..file_name.len() - 4];
+            let parts: Vec<&str> = file_name_no_ext.split('_').collect();
+            let baseline = match parts[0] {
+                "runc" => AvailableBaselines::Runc,
+                "kata" => AvailableBaselines::Kata,
+                "snp" => AvailableBaselines::Snp,
+                "tdx" => AvailableBaselines::Tdx,
+                other => {
+                    eprintln!("Unsupported baseline in input: {}", other);
+                    continue;
+                }
+            };
+            let flavour: StartUpFlavours = parts[1].parse().unwrap();
 
             // Based on the flavour, we pick one of the data dictionaries
             let data = match flavour {
@@ -539,252 +552,219 @@ impl Plot {
         let mut plot_path = Env::results_root();
         plot_path.push(format!("{exp}"));
         plot_path.push("plots");
-        fs::create_dir_all(plot_path.clone()).unwrap();
-        plot_path.push(format!("{}.svg", exp.to_string().replace("-", "_")));
+        fs::create_dir_all(&plot_path).unwrap();
 
-        let chart_height_px = 600;
-        let chart_width_px = 400;
-        let root =
-            SVGBackend::new(&plot_path, (chart_height_px, chart_width_px)).into_drawing_area();
-        root.fill(&WHITE).unwrap();
+        let chart_height_px = 250;
+        let chart_width_px = 250;
+        let x_max = baselines.iter().len() as f64; // <--- change this
 
-        let x_max = AvailableBaselines::iter_variants().len() as f64;
-        let mut chart = ChartBuilder::on(&root)
-            .x_label_area_size(40)
-            .y_label_area_size(40)
-            .margin(10)
-            .margin_top(40)
-            .build_cartesian_2d(0.0..x_max, 0f64..(y_max / 1000.0))
+        for (flavour, data) in &[
+            (StartUpFlavours::Cold, &cold_data),
+            (StartUpFlavours::Warm, &warm_data),
+        ] {
+            let mut out_path = plot_path.clone();
+            out_path.push(format!(
+                "{}_{}.svg",
+                exp.to_string().replace("-", "_"),
+                flavour.to_string().to_lowercase(),
+            ));
+
+            let root =
+                SVGBackend::new(&out_path, (chart_height_px, chart_width_px)).into_drawing_area();
+            root.fill(&WHITE).unwrap();
+
+            let mut chart = ChartBuilder::on(&root)
+                .x_label_area_size(40)
+                .y_label_area_size(40)
+                .margin(10)
+                .margin_top(40)
+                .build_cartesian_2d(0.0..x_max, 0f64..(y_max / 1000.0))
+                .unwrap();
+
+            chart
+                .configure_mesh()
+                .y_label_style(("sans-serif", 15).into_font())
+                .y_labels(10)
+                .y_max_light_lines(1) // changed this from 5 to 1
+                .disable_x_mesh()
+                .disable_x_axis()
+                .y_label_formatter(&|y| format!("{:.0}", y))
+                .draw()
+                .unwrap();
+
+            // Manually draw the y-axis label with a custom font and size
+            root.draw(&Text::new(
+                "Start-Up Latency [s]",
+                (3, 180),
+                ("sans-serif", 15)
+                    .into_font()
+                    .transform(FontTransform::Rotate270)
+                    .color(&BLACK),
+            ))
             .unwrap();
 
-        chart
-            .configure_mesh()
-            .y_label_style(("sans-serif", 20).into_font())
-            .y_labels(10)
-            .y_max_light_lines(5)
-            .disable_x_mesh()
-            .disable_x_axis()
-            .y_label_formatter(&|y| format!("{:.0}", y))
-            .draw()
-            .unwrap();
-
-        // Manually draw the y-axis label with a custom font and size
-        root.draw(&Text::new(
-            "Start-Up Latency [s]",
-            (3, 280),
-            ("sans-serif", 20)
-                .into_font()
-                .transform(FontTransform::Rotate270)
-                .color(&BLACK),
-        ))
-        .unwrap();
-
-        let bar_width = 0.5;
-        for (data_idx, data) in (0..).zip([cold_data.clone(), warm_data.clone()]) {
-            // Draw bars: we draw one series for each event, and we stack them
-            // together
-            let mut prev_y_map: BTreeMap<&AvailableBaselines, f64> = BTreeMap::new();
+            let bar_width = 0.8;
+            let mut prev_y = BTreeMap::new();
             for baseline in AvailableBaselines::iter_variants() {
-                prev_y_map.insert(baseline, 0.0);
+                prev_y.insert(baseline, 0.0);
             }
 
             for event in Containerd::CONTAINERD_INFO_EVENTS {
                 chart
-                    .draw_series((0..).zip(data.iter()).map(|(x, (baseline, event_vec))| {
-                        let this_color = if data_idx == 0 {
-                            Containerd::get_color_for_event(event).into()
-                        } else {
-                            Containerd::get_color_for_event(event).mix(0.6)
-                        };
-                        let bar_style = ShapeStyle {
-                            color: this_color,
+                    .draw_series((0..).zip(data.iter()).map(|(i, (baseline, times))| {
+                        let color = Containerd::get_color_for_event(event).into();
+                        let style = ShapeStyle {
+                            color,
                             filled: true,
                             stroke_width: 2,
                         };
-
-                        // Handle the StartUp case separately
-                        let mut this_y = *event_vec.get(event).unwrap();
-                        if event == "StartUp" {
-                            this_y = *event_vec.get("Orchestration").unwrap();
-                        }
-                        let prev_y = prev_y_map.get_mut(baseline).unwrap();
-                        this_y /= 1000.0;
-
-                        let x_orig: f64 = x as f64 + 0.5 * data_idx as f64;
-
-                        let mut bar = Rectangle::new(
-                            [(x_orig, *prev_y), (x_orig + bar_width, *prev_y + this_y)],
-                            bar_style,
-                        );
-                        *prev_y += this_y;
-
-                        // Set the margins so that bars for the same baseline
-                        // touch
-                        if data_idx == 0 {
-                            bar.set_margin(0, 0, 2, 0);
+                        let height = if event == "StartUp" {
+                            *times.get("Orchestration").unwrap()
                         } else {
-                            bar.set_margin(0, 0, 0, 2);
-                        }
-
-                        bar
+                            *times.get(event).unwrap()
+                        } / 1000.0;
+                        let y0 = prev_y.get_mut(baseline).unwrap();
+                        let x0 = i as f64;
+                        let mut rect =
+                            Rectangle::new([(x0, *y0), (x0 + bar_width, *y0 + height)], style);
+                        rect.set_margin(0, 0, 2, 2);
+                        *y0 += height;
+                        rect
                     }))
                     .unwrap();
             }
 
             // Add black frame around each bar
             chart
-                .draw_series((0..).zip(data.iter()).map(|(x, (baseline, _))| {
-                    // Benefit from the fact that prev_y stores the maximum y
-                    // value after we plot the stacked bar chart
-                    let this_y = *prev_y_map.get_mut(baseline).unwrap();
-
-                    let x_orig: f64 = x as f64 + 0.5 * data_idx as f64;
+                .draw_series((0..).zip(data.iter()).map(|(i, (baseline, _))| {
+                    let this_y = *prev_y.get(&baseline).unwrap();
+                    let x_orig = i as f64;
                     let margin_px = 2;
                     let x_axis_range = 0.0..x_max;
                     let margin_units = margin_px as f64 * (x_axis_range.end - x_axis_range.start)
                         / chart_width_px as f64;
 
-                    if data_idx == 0 {
-                        PathElement::new(
-                            vec![
-                                (x_orig + margin_units, this_y),
-                                (x_orig + bar_width, this_y),
-                                (x_orig + bar_width, 0.0),
-                                (x_orig + margin_units, 0.0),
-                                (x_orig + margin_units, this_y),
-                            ],
-                            BLACK,
-                        )
-                    } else {
-                        PathElement::new(
-                            vec![
-                                (x_orig, this_y),
-                                (x_orig - margin_units + bar_width, this_y),
-                                (x_orig - margin_units + bar_width, 0.0),
-                                (x_orig, 0.0),
-                                (x_orig, this_y),
-                            ],
-                            BLACK,
-                        )
-                    }
+                    PathElement::new(
+                        vec![
+                            (x_orig + margin_units, this_y),
+                            (x_orig + bar_width - margin_units, this_y),
+                            (x_orig + bar_width - margin_units, 0.0),
+                            (x_orig + margin_units, 0.0),
+                            (x_orig + margin_units, this_y),
+                        ],
+                        BLACK,
+                    )
                 }))
                 .unwrap();
-        }
 
-        // Add solid frames around grid
-        chart
-            .plotting_area()
-            .draw(&PathElement::new(vec![(0.0, y_max), (x_max, y_max)], BLACK))
-            .unwrap();
-        chart
-            .plotting_area()
-            .draw(&PathElement::new(
-                vec![(x_max, 0 as f64), (x_max, y_max)],
-                BLACK,
-            ))
-            .unwrap();
-        chart
-            .plotting_area()
-            .draw(&PathElement::new(
-                vec![(0.0, 0 as f64), (x_max, 0 as f64)],
-                BLACK,
-            ))
-            .unwrap();
+            // Draw frames
+            chart
+                .plotting_area()
+                .draw(&PathElement::new(
+                    vec![(0.0, y_max / 1000.0), (x_max, y_max / 1000.0)],
+                    &BLACK,
+                ))
+                .unwrap();
+            chart
+                .plotting_area()
+                .draw(&PathElement::new(
+                    vec![(x_max, 0.0), (x_max, y_max / 1000.0)],
+                    &BLACK,
+                ))
+                .unwrap();
+            chart
+                .plotting_area()
+                .draw(&PathElement::new(vec![(0.0, 0.0), (x_max, 0.0)], &BLACK))
+                .unwrap();
 
-        // Manually draw the x-axis labels with a custom font and size
-        fn xaxis_pos_for_baseline(baseline: &AvailableBaselines) -> i32 {
-            match baseline {
-                AvailableBaselines::Runc => 80,
-                AvailableBaselines::Kata => 180,
-                AvailableBaselines::Snp => 260,
-                AvailableBaselines::SnpSc2 => 340,
-                AvailableBaselines::Tdx => 445,
-                AvailableBaselines::TdxSc2 => 520,
-            }
-        }
-
-        for (_, baseline) in (0..).zip(AvailableBaselines::iter_variants()) {
-            root.draw(&Text::new(
-                format!("{baseline}"),
-                (xaxis_pos_for_baseline(baseline), 360),
-                ("sans-serif", 20).into_font().color(&BLACK),
-            ))
-            .unwrap();
-        }
-
-        // Manually draw the legend outside the grid, above the chart
-        let legend_labels = vec![
-            "control-plane",
-            "create-vm",
-            "pull-image-host",
-            "pull-image-guest",
-        ];
-
-        fn legend_pos_for_label(label: &str) -> (i32, i32) {
-            let legend_x_start = 20;
-            let legend_y_pos = 6;
-
-            match label {
-                "control-plane" => (legend_x_start, legend_y_pos),
-                "create-vm" => (legend_x_start + 140, legend_y_pos),
-                "pull-image-host" => (legend_x_start + 255, legend_y_pos),
-                "pull-image-guest" => (legend_x_start + 410, legend_y_pos),
-                _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
-            }
-        }
-
-        fn legend_color_for_label(label: &str) -> RGBColor {
-            match label {
-                "control-plane" => Containerd::get_color_for_event("StartUp"),
-                "create-vm" => Containerd::get_color_for_event("RunPodSandbox"),
-                "pull-image-host" => Containerd::get_color_for_event("PullImage"),
-                "pull-image-guest" => {
-                    Containerd::get_color_for_event("StartContainerUserContainer")
+            // Manually draw the x-axis labels with a custom font and size
+            fn xaxis_pos_for_baseline(b: &AvailableBaselines) -> i32 {
+                match b {
+                    AvailableBaselines::Runc => 57,
+                    AvailableBaselines::Kata => 103,
+                    AvailableBaselines::Snp => 153,
+                    AvailableBaselines::SnpSc2 => 600,
+                    AvailableBaselines::Tdx => 203,
+                    AvailableBaselines::TdxSc2 => 600, // cheesy
                 }
-                _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
             }
+            for (_, baseline) in (0..).zip(AvailableBaselines::iter_variants()) {
+                root.draw(&Text::new(
+                    format!("{baseline}"),
+                    (xaxis_pos_for_baseline(baseline), 210),
+                    ("sans-serif", 15).into_font().color(&BLACK),
+                ))
+                .unwrap();
+            }
+
+            // Manually draw the legend outside the grid, above the charts
+            let cold_legend_labels = vec!["control-plane", "create-vm"];
+            let warm_legend_labels = vec!["pull-image-host", "pull-image-guest"];
+
+            let legend_labels = if *flavour == StartUpFlavours::Cold {
+                &cold_legend_labels
+            } else {
+                &warm_legend_labels
+            };
+
+            fn legend_pos_for_label(label: &str) -> (i32, i32) {
+                let start = 20;
+                let y = 6;
+                match label {
+                    "control-plane" => (start, y),
+                    "create-vm" => (start + 120, y),
+                    "pull-image-host" => (start, y),
+                    "pull-image-guest" => (start + 115, y),
+                    _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
+                }
+            }
+            fn legend_color_for_label(label: &str) -> RGBColor {
+                match label {
+                    "control-plane" => Containerd::get_color_for_event("StartUp"),
+                    "create-vm" => Containerd::get_color_for_event("RunPodSandbox"),
+                    "pull-image-host" => Containerd::get_color_for_event("PullImage"),
+                    "pull-image-guest" => {
+                        Containerd::get_color_for_event("StartContainerUserContainer")
+                    }
+                    _ => panic!("{}(plot): unrecognised label: {label}", Env::SYS_NAME),
+                }
+            }
+
+            for &label in legend_labels {
+                // Calculate position for each legend item
+                let (x, y) = legend_pos_for_label(label);
+
+                // Draw the color box (Rectangle)
+                root.draw(&Rectangle::new(
+                    [(x, y), (x + 15, y + 15)],
+                    legend_color_for_label(label).filled(),
+                ))
+                .unwrap();
+
+                // Draw the color box frame (Rectangle)
+                root.draw(&PathElement::new(
+                    vec![(x, y), (x, y + 15), (x + 15, y + 15), (x + 15, y), (x, y)],
+                    BLACK,
+                ))
+                .unwrap();
+
+                // Draw the baseline label (Text)
+                root.draw(&Text::new(
+                    label,
+                    (x + 25, y + 3),
+                    ("sans-serif", 15).into_font(),
+                ))
+                .unwrap();
+            }
+
+            println!(
+                "{}(plot): generated {} plot at: {}",
+                Env::SYS_NAME,
+                flavour,
+                out_path.display()
+            );
+            root.present().unwrap();
         }
-
-        for label in legend_labels {
-            // Calculate position for each legend item
-            let (x_pos, y_pos) = legend_pos_for_label(label);
-
-            // Draw the color box (Rectangle)
-            root.draw(&Rectangle::new(
-                [(x_pos, y_pos), (x_pos + 20, y_pos + 20)],
-                legend_color_for_label(label).filled(),
-            ))
-            .unwrap();
-
-            // Draw the baseline label (Text)
-            root.draw(&Text::new(
-                label,
-                (x_pos + 30, y_pos + 5),
-                ("sans-serif", 20).into_font(),
-            ))
-            .unwrap();
-        }
-
-        // Manually draw cold/warm labels for one bar
-        root.draw(&Text::new(
-            format!("{}", StartUpFlavours::Cold),
-            (60, 300),
-            ("sans-serif", 14).into_font(),
-        ))
-        .unwrap();
-        root.draw(&Text::new(
-            format!("{}", StartUpFlavours::Warm),
-            (100, 320),
-            ("sans-serif", 14).into_font(),
-        ))
-        .unwrap();
-
-        println!(
-            "{}(plot): generated plot at: {}",
-            Env::SYS_NAME,
-            plot_path.display()
-        );
-        root.present().unwrap();
     }
 
     pub fn plot(exp: &AvailableExperiments) {
