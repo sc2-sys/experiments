@@ -465,9 +465,10 @@ impl Plot {
                 .unwrap_or_default();
             let file_name_len = file_name.len();
             let file_name_no_ext = &file_name[0..file_name_len - 4];
-            let baseline: AvailableBaselines = file_name_no_ext.split('_').collect::<Vec<_>>()[0]
-                .parse()
-                .unwrap();
+            let baseline: AvailableBaselines = match file_name_no_ext.split('_').collect::<Vec<_>>()[0].parse() {
+                Ok(baseline) => baseline,
+                Err(_) => continue,
+            };
             let flavour: StartUpFlavours = file_name_no_ext.split('_').collect::<Vec<_>>()[1]
                 .parse()
                 .unwrap();
@@ -698,12 +699,12 @@ impl Plot {
         // Manually draw the x-axis labels with a custom font and size
         fn xaxis_pos_for_baseline(baseline: &AvailableBaselines) -> i32 {
             match baseline {
-                AvailableBaselines::Runc => 80,
-                AvailableBaselines::Kata => 180,
-                AvailableBaselines::Snp => 260,
-                AvailableBaselines::SnpSc2 => 340,
-                AvailableBaselines::Tdx => 445,
-                AvailableBaselines::TdxSc2 => 520,
+                AvailableBaselines::Runc => 100,
+                AvailableBaselines::Kata => 240,
+                AvailableBaselines::Snp => 370,
+                // AvailableBaselines::SnpSc2 => 340,
+                AvailableBaselines::Tdx => 510,
+                // AvailableBaselines::TdxSc2 => 520,
             }
         }
 
@@ -824,9 +825,10 @@ impl Plot {
                 .unwrap_or_default();
             let file_name_len = file_name.len();
             let file_name_no_ext = &file_name[0..file_name_len - 4];
-            let baseline: AvailableBaselines = file_name_no_ext.split('_').collect::<Vec<_>>()[0]
-                .parse()
-                .unwrap();
+            let baseline: AvailableBaselines = match file_name_no_ext.split('_').collect::<Vec<_>>()[0].parse() {
+                Ok(baseline) => baseline,
+                Err(_) => continue,
+            };
             let flavour: StartUpFlavours = file_name_no_ext.split('_').collect::<Vec<_>>()[1]
                 .parse()
                 .unwrap();
@@ -987,12 +989,12 @@ impl Plot {
         // Manually draw the x-axis labels with a custom font and size
         fn xaxis_pos_for_baseline(baseline: &AvailableBaselines) -> i32 {
             match baseline {
-                AvailableBaselines::Runc => 80,
-                AvailableBaselines::Kata => 180,
-                AvailableBaselines::Snp => 260,
-                AvailableBaselines::SnpSc2 => 340,
-                AvailableBaselines::Tdx => 445,
-                AvailableBaselines::TdxSc2 => 520,
+                AvailableBaselines::Runc => 100,
+                AvailableBaselines::Kata => 240,
+                AvailableBaselines::Snp => 450,
+                // AvailableBaselines::SnpSc2 => 340,
+                AvailableBaselines::Tdx => 555,
+                // AvailableBaselines::TdxSc2 => 520,
             }
         }
 

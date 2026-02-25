@@ -429,9 +429,9 @@ impl Exp {
                         AvailableBaselines::Runc => "runc".to_string(),
                         AvailableBaselines::Kata => "kata-qemu".to_string(),
                         AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
-                        AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
+                        // AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
                         AvailableBaselines::Tdx => "kata-qemu-tdx".to_string(),
-                        AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
+                        // AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
                     },
                 ),
                 ("KSERVICE_NAME", "hello-world".to_string()),
@@ -475,9 +475,9 @@ impl Exp {
                         AvailableBaselines::Runc => "runc".to_string(),
                         AvailableBaselines::Kata => "kata-qemu".to_string(),
                         AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
-                        AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
+                        // AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
                         AvailableBaselines::Tdx => "kata-qemu-tdx".to_string(),
-                        AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
+                        // AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
                     },
                 ),
                 ("KSERVICE_NAME", "hello-world".to_string()),
@@ -509,7 +509,7 @@ impl Exp {
     /// workloads.
     pub fn run_image_pull(args: &ImagePullRunArgs) {
         let yaml_path: PathBuf = Env::apps_root().join("functions");
-        let baseline = AvailableBaselines::SnpSc2;
+        let baseline = AvailableBaselines::Snp;
 
         // ---------------------------------------------------------------------
         // Parse command line arguments
@@ -574,9 +574,9 @@ impl Exp {
                     AvailableBaselines::Runc => "runc".to_string(),
                     AvailableBaselines::Kata => "kata-qemu".to_string(),
                     AvailableBaselines::Snp => "kata-qemu-snp".to_string(),
-                    AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
+                    // AvailableBaselines::SnpSc2 => "kata-qemu-snp-sc2".to_string(),
                     AvailableBaselines::Tdx => "kata-qemu-tdx".to_string(),
-                    AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
+                    // AvailableBaselines::TdxSc2 => "kata-qemu-tdx-sc2".to_string(),
                 },
             ),
         ]);

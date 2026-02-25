@@ -55,37 +55,27 @@
 <text x="5" y="250" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000" transform="rotate(270, 5, 250)">
 Sandbox Creation Latency [s]
 </text>
-<rect x="52" y="245" width="85" height="4" opacity="1" fill="#56B4E9" stroke="none"/>
-<rect x="141" y="234" width="86" height="15" opacity="1" fill="#56B4E9" stroke="none"/>
-<rect x="231" y="76" width="86" height="173" opacity="1" fill="#56B4E9" stroke="none"/>
-<rect x="321" y="244" width="86" height="5" opacity="1" fill="#56B4E9" stroke="none"/>
-<rect x="411" y="75" width="86" height="174" opacity="1" fill="#56B4E9" stroke="none"/>
-<rect x="501" y="230" width="86" height="19" opacity="1" fill="#56B4E9" stroke="none"/>
-<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="51,245 138,245 138,249 51,249 51,245 "/>
-<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="141,234 227,234 227,249 141,249 141,234 "/>
-<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="231,76 317,76 317,249 231,249 231,76 "/>
-<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="321,244 407,244 407,249 321,249 321,244 "/>
-<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="411,75 497,75 497,249 411,249 411,75 "/>
-<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="500,230 587,230 587,249 500,249 500,230 "/>
+<rect x="52" y="245" width="130" height="4" opacity="1" fill="#56B4E9" stroke="none"/>
+<rect x="186" y="234" width="131" height="15" opacity="1" fill="#56B4E9" stroke="none"/>
+<rect x="321" y="76" width="131" height="173" opacity="1" fill="#56B4E9" stroke="none"/>
+<rect x="456" y="75" width="131" height="174" opacity="1" fill="#56B4E9" stroke="none"/>
+<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="51,245 182,245 182,249 51,249 51,245 "/>
+<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="186,234 317,234 317,249 186,249 186,234 "/>
+<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="321,76 452,76 452,249 321,249 321,76 "/>
+<polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="456,75 587,75 587,249 456,249 456,75 "/>
 <polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="50,40 589,40 "/>
 <polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="589,249 589,40 "/>
 <polyline fill="none" opacity="1" stroke="#000000" stroke-width="1" points="50,249 589,249 "/>
-<text x="80" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
+<text x="100" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
 runc
 </text>
-<text x="180" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
+<text x="240" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
 kata
 </text>
-<text x="260" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
+<text x="450" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
 snp
 </text>
-<text x="340" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
-snp-sc2
-</text>
-<text x="445" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
+<text x="555" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
 tdx
-</text>
-<text x="520" y="260" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="16.129032258064516" opacity="1" fill="#000000">
-tdx-sc2
 </text>
 </svg>
